@@ -1,0 +1,89 @@
+{
+  "template_id": "image_template1",
+  "description": "Template para geração de imagens de cidades futuristas em estilo cyberpunk",
+  "version": "1.0",
+  "metadata": {
+    "model_options": ["sdxl", "flux"],
+    "dimension_limits": {
+      "min_width": 256,
+      "max_width": 2048,
+      "min_height": 256,
+      "max_height": 2048
+    },
+    "inference_limits": {
+      "max_steps": 150,
+      "guidance_scale_range": [1.0, 20.0],
+      "conditioning_scale_range": [0.0, 2.0]
+    },
+    "preprocessor_options": ["canny", "depth", "mlsd", "normal", "openpose", "scribble"],
+    "sampler_options": ["ddim", "dpm_solver_multistep", "euler", "euler_ancestral", "unipc"]
+  },
+  
+  "model": "sdxl",
+  "prompt": "(cidade futurista:1.2) durante o (pôr do sol:1.1), estilo {cyberpunk|sci-fi}, (neon lights:1.3), (high quality:1.2), (detailed:1.1), (sharp focus:1.1), (intricate details:1.2)",
+  "negative_prompt": "(low quality:1.4), (blurry:1.4), (bad anatomy:1.2), (deformed:1.3), (mutation:1.2), (ugly:1.3), (duplicate:1.1), (morbid:1.1), (mutilated:1.2), (poorly drawn face:1.3), (poorly drawn hands:1.3), (poorly drawn feet:1.3), (poorly drawn legs:1.3), (poorly drawn arms:1.3), (out of frame:1.2), (bad art:1.3), (watermark:1.3), (signature:1.2), (extra limbs:1.3), (missing limbs:1.3), (cut off:1.2), (low contrast:1.2), (underexposed:1.2), (overexposed:1.2), (bad lighting:1.3)",
+  "height": 1024,
+  "width": 1024,
+  "num_inference_steps": 50,
+  "guidance_scale": 7.5,
+  
+  "loras": [
+    {
+      "path": "models/loras/cyberpunk_style.safetensors",
+      "scale": 0.75,
+      "is_version": "2.0",
+      "base_model_compatibility": ["sdxl", "sd1.5"]
+    },
+    {
+      "path": "models/loras/architecture_enhance.safetensors",
+      "scale": 0.65,
+      "is_version": "2.0",
+      "base_model_compatibility": ["sdxl"]
+    }
+  ],
+  
+  "controlnet": {
+    "model_id": "lllyasviel/control_v11p_sd15_canny",
+    "image_url": null,
+    "image_base64": null,
+    "preprocessor": "canny",
+    "preprocessor_params": {
+      "low_threshold": 100,
+      "high_threshold": 200,
+      "denoise_strength": 0.5
+    },
+    "conditioning_scale": 0.8,
+    "control_mode": "balanced"
+  },
+  
+  "optimization": {
+    "vae": "stabilityai/sd-vae-ft-mse",
+    "tiling": false,
+    "enable_vae_tiling": true,
+    "enable_vae_slicing": true,
+    "enable_sequential_cpu_offload": false,
+    "enable_attention_slicing": "max",
+    "enable_model_cpu_offload": false,
+    "torch_compile": true,
+    "torch_compile_mode": "reduce-overhead"
+  },
+  
+  "sampler": {
+    "name": "dpm_solver_multistep",
+    "config": {
+      "beta_schedule": "scaled_linear",
+      "beta_start": 0.00085,
+      "beta_end": 0.012,
+      "solver_order": 2
+    }
+  },
+  
+  "seed": null,
+  "clip_skip": 2,
+  "safety_checker": false,
+  "tomesd": {
+    "enabled": true,
+    "ratio": 0.4,
+    "max_downsample": 2
+  }
+}

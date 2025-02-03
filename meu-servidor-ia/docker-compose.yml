@@ -89,15 +89,19 @@ services:
     environment:
       - API_TOKEN=your_api_token_here
       - NVIDIA_VISIBLE_DEVICES=all
-      - NVIDIA_DRIVER_CAPABILITIES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+      - CUDA_VISIBLE_DEVICES=0  # Pode ser ajustado para GPUs específicas
+      # Limites de memória GPU (em MB)
+      - GPU_MEMORY_LIMIT=4096
     gpus: all
     deploy:
       resources:
         reservations:
           devices:
             - driver: nvidia
-              count: all
+              count: 1  # Limitar a uma GPU por container
               capabilities: [gpu]
+              device_ids: ['0']  # GPU específica (opcional)
     restart: always
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/healthcheck"]

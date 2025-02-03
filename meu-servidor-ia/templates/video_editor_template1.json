@@ -1,0 +1,122 @@
+{
+  "template_id": "video_editor_template1",
+  "description": "Template para criação de vídeos com imagens, textos e música",
+  "version": "1.0",
+  "metadata": {
+    "supported_formats": {
+      "input": ["jpg", "png", "mp4", "wav", "mp3"],
+      "output": ["mp4"]
+    },
+    "resolution_presets": {
+      "hd": {"width": 1280, "height": 720},
+      "full_hd": {"width": 1920, "height": 1080},
+      "4k": {"width": 3840, "height": 2160}
+    }
+  },
+
+  "default_settings": {
+    "width": 1920,
+    "height": 1080,
+    "fps": 30,
+    "quality": "high",
+    "format": "mp4",
+    "codec": "libx264",
+    "pixel_format": "yuv420p",
+    "audio_codec": "aac",
+    "audio_bitrate": "192k",
+    "video_bitrate": "4M"
+  },
+
+  "transitions": {
+    "default": "fade",
+    "options": {
+      "fade": {
+        "duration": 1.0,
+        "type": "fade"
+      },
+      "crossfade": {
+        "duration": 1.0,
+        "type": "xfade"
+      },
+      "slide": {
+        "duration": 1.0,
+        "type": "slide"
+      }
+    }
+  },
+
+  "text_presets": {
+    "title": {
+      "font_size": 72,
+      "font_color": "white",
+      "font_family": "Arial",
+      "position": "center",
+      "outline_width": 2,
+      "outline_color": "black",
+      "duration": 5
+    },
+    "subtitle": {
+      "font_size": 48,
+      "font_color": "white",
+      "font_family": "Arial",
+      "position": "bottom",
+      "outline_width": 1,
+      "outline_color": "black",
+      "duration": 3
+    }
+  },
+
+  "image_settings": {
+    "default_duration": 5,
+    "zoom_effects": {
+      "ken_burns": {
+        "zoom_start": 1.0,
+        "zoom_end": 1.2,
+        "direction": "in"
+      },
+      "pan": {
+        "start_position": "center",
+        "end_position": "right",
+        "duration": 5
+      }
+    }
+  },
+
+  "audio_settings": {
+    "fade_in": 2,
+    "fade_out": 2,
+    "volume": 1.0,
+    "normalize_audio": true,
+    "background_music": {
+      "volume": 0.3,
+      "fade_in": 3,
+      "fade_out": 3,
+      "loop": true
+    }
+  },
+
+  "scene_defaults": {
+    "transition": "fade",
+    "duration": 5,
+    "text_position": "center",
+    "zoom": 1.0
+  },
+
+  "output_settings": {
+    "format": "mp4",
+    "quality_presets": {
+      "high": {
+        "crf": 18,
+        "preset": "slow"
+      },
+      "medium": {
+        "crf": 23,
+        "preset": "medium"
+      },
+      "low": {
+        "crf": 28,
+        "preset": "fast"
+      }
+    }
+  }
+}

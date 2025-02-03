@@ -4,10 +4,11 @@ metadata:
   name: content-api-ingress
   annotations:
     nginx.ingress.kubernetes.io/rewrite-target: /$1
-    # Se estiver usando Cert-Manager para SSL, adicione as anotações necessárias
+    # Caso utilize Cert-Manager para SSL, adicione as anotações necessárias, por exemplo:
+    # cert-manager.io/cluster-issuer: "letsencrypt-prod"
 spec:
   rules:
-  - host: contentapi.ruanpiscitelli.com  # Substitua pelo seu domínio real
+  - host: contentapi.ruanpiscitelli.com
     http:
       paths:
       - path: /dashboard/(.*)

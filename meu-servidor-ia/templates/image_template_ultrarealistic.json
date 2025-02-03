@@ -1,0 +1,87 @@
+{
+  "template_id": "image_template_ultrarealistic",
+  "description": "Template para geração de imagens ultra realistas usando SDXL",
+  "version": "1.0",
+  "metadata": {
+    "model_options": ["sdxl"],
+    "dimension_limits": {
+      "min_width": 1024,
+      "max_width": 2048,
+      "min_height": 1024,
+      "max_height": 2048
+    },
+    "inference_limits": {
+      "max_steps": 100,
+      "guidance_scale_range": [5.0, 12.0],
+      "conditioning_scale_range": [0.5, 1.5]
+    },
+    "preprocessor_options": ["canny", "depth", "normal"]
+  },
+  
+  "model": "sdxl",
+  "prompt": "(ultra realistic photograph:1.4), (photorealistic:1.3), (8k uhd:1.2), (highly detailed:1.2), (professional photography:1.2), masterpiece, (sharp focus:1.2), (dslr:1.1), (high quality:1.3), (film grain:0.3), (natural lighting:1.2), (color grading:1.1), (post-processing:1.1), (raw photo:1.2), (award winning photo:1.1)",
+  "negative_prompt": "(painting:1.5), (drawing:1.5), (illustration:1.4), (digital art:1.4), (anime:1.5), (cartoon:1.5), (3d render:1.4), (low quality:1.4), (blurry:1.3), (watermark:1.3), (signature:1.2), (out of focus:1.3), (overexposed:1.2), (underexposed:1.2), (bad lighting:1.3), (amateur:1.3), (distorted:1.3), (deformed:1.4), (disfigured:1.3), (bad anatomy:1.4), (unnatural:1.3)",
+  "height": 1024,
+  "width": 1024,
+  "num_inference_steps": 50,
+  "guidance_scale": 7.5,
+  
+  "loras": [
+    {
+      "path": "models/loras/detail_slider_v4.safetensors",
+      "scale": 0.6,
+      "is_version": "2.0",
+      "base_model_compatibility": ["sdxl"]
+    },
+    {
+      "path": "models/loras/realistic_photography_v1.safetensors",
+      "scale": 0.45,
+      "is_version": "2.0",
+      "base_model_compatibility": ["sdxl"]
+    }
+  ],
+  
+  "controlnet": {
+    "model_id": "diffusers/controlnet-depth-sdxl-1.0",
+    "image_url": null,
+    "image_base64": null,
+    "preprocessor": "depth",
+    "preprocessor_params": {
+      "detect_resolution": 1024,
+      "image_resolution": 1024,
+      "strength": 0.8
+    },
+    "conditioning_scale": 0.7,
+    "control_mode": "balanced"
+  },
+  
+  "optimization": {
+    "vae": "madebyollin/sdxl-vae-fp16-fix",
+    "tiling": false,
+    "enable_vae_tiling": true,
+    "enable_vae_slicing": true,
+    "enable_sequential_cpu_offload": false,
+    "enable_attention_slicing": "max",
+    "enable_model_cpu_offload": false,
+    "torch_compile": true,
+    "torch_compile_mode": "reduce-overhead"
+  },
+  
+  "sampler": {
+    "name": "euler",
+    "config": {
+      "beta_schedule": "scaled_linear",
+      "beta_start": 0.00085,
+      "beta_end": 0.012
+    }
+  },
+  
+  "seed": null,
+  "clip_skip": 2,
+  "safety_checker": false,
+  "tomesd": {
+    "enabled": true,
+    "ratio": 0.4,
+    "max_downsample": 2
+  }
+} 

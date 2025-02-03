@@ -1,7 +1,30 @@
-fastapi==0.95.2
-uvicorn==0.21.1
-gunicorn==20.1.0
-pydantic==1.10.7
-torch==2.0.1
-hunyuan==0.1.0    # Ajuste para a versão oficial do Hunyuan Video Generator, se disponível
-minio==7.1.4
+# FastAPI e dependências
+fastapi>=0.95.2
+uvicorn>=0.21.1
+python-multipart>=0.0.5
+pydantic>=1.10.7
+
+# FastVideo e otimizações
+torch>=2.1.0
+torchvision>=0.16.0
+diffusers>=0.24.0
+transformers>=4.36.0
+accelerate>=0.25.0
+xformers>=0.0.23
+bitsandbytes>=0.41.1
+safetensors>=0.4.0
+
+# Cache e armazenamento
+redis>=4.5.4
+minio>=7.1.15
+
+# Monitoramento
+prometheus-client>=0.16.0
+
+# Utilitários
+python-dotenv>=1.0.0
+omegaconf>=2.3.0
+einops>=0.7.0
+numpy>=1.24.3
+pillow>=10.0.0
+opencv-python-headless>=4.8.0

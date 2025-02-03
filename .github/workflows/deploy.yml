@@ -1,0 +1,87 @@
+name: CI/CD Pipeline - Deploy to Production
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build_and_push:
+    name: Build and Push Docker Images
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_PASSWORD }}
+
+      - name: Build and Push Dashboard Image
+        run: |
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/dashboard:latest ./dashboard
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/dashboard:latest
+
+      - name: Build and Push Image Generator Image
+        run: |
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/image-generator:latest ./services/image_generator
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/image-generator:latest
+
+      - name: Build and Push Voice Generator Image
+        run: |
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/voice-generator:latest ./services/voice_generator
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/voice-generator:latest
+
+      - name: Build and Push Video Generator Image
+        run: |
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/video-generator:latest ./services/video_generator
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/video-generator:latest
+
+      - name: Build and Push Video Editor Image
+        run: |
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/video-editor:latest ./services/video_editor
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/video-editor:latest
+
+  deploy:
+    name: Deploy to Kubernetes
+    needs: build_and_push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: '1.25.0'  # Ajuste para a versão que seu cluster utiliza
+
+      - name: Configure kubeconfig
+        run: echo "${{ secrets.KUBECONFIG }}" > $HOME/.kube/config
+
+      - name: Deploy to Kubernetes
+        env:
+          KUBECONFIG: ${{ secrets.KUBECONFIG }}
+        run: |
+          kubectl apply -f k8s/dashboard-deployment.yaml
+          kubectl apply -f k8s/dashboard-service.yaml
+          kubectl apply -f k8s/image-generator-deployment.yaml
+          kubectl apply -f k8s/image-generator-service.yaml
+          kubectl apply -f k8s/image-generator-hpa.yaml
+          kubectl apply -f k8s/voice-generator-deployment.yaml
+          kubectl apply -f k8s/voice-generator-service.yaml
+          kubectl apply -f k8s/voice-generator-hpa.yaml
+          kubectl apply -f k8s/video-generator-deployment.yaml
+          kubectl apply -f k8s/video-generator-service.yaml
+          kubectl apply -f k8s/video-generator-hpa.yaml
+          kubectl apply -f k8s/video-editor-deployment.yaml
+          kubectl apply -f k8s/video-editor-service.yaml
+          kubectl apply -f k8s/video-editor-hpa.yaml
+          kubectl apply -f k8s/ingress.yaml

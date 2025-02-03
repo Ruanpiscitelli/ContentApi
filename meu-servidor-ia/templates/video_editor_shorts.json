@@ -1,0 +1,205 @@
+{
+  "template_id": "video_editor_shorts",
+  "description": "Template otimizado para criação de Shorts/Reels verticais",
+  "version": "1.0",
+  "metadata": {
+    "supported_formats": {
+      "input": ["jpg", "png", "mp4", "wav", "mp3"],
+      "output": ["mp4"]
+    },
+    "resolution_presets": {
+      "shorts": {"width": 1080, "height": 1920},
+      "reels": {"width": 1080, "height": 1920},
+      "tiktok": {"width": 1080, "height": 1920}
+    }
+  },
+
+  "default_settings": {
+    "width": 1080,
+    "height": 1920,
+    "fps": 30,
+    "quality": "high",
+    "format": "mp4",
+    "codec": "libx264",
+    "pixel_format": "yuv420p",
+    "audio_codec": "aac",
+    "audio_bitrate": "128k",
+    "video_bitrate": "2M",
+    "max_duration": 60
+  },
+
+  "transitions": {
+    "default": "fast_fade",
+    "options": {
+      "fast_fade": {
+        "duration": 0.3,
+        "type": "fade"
+      },
+      "flash": {
+        "duration": 0.2,
+        "type": "fade",
+        "color": "white"
+      },
+      "slide_up": {
+        "duration": 0.5,
+        "type": "slide",
+        "direction": "up"
+      },
+      "zoom_blur": {
+        "duration": 0.4,
+        "type": "zoom",
+        "blur": true
+      }
+    }
+  },
+
+  "text_presets": {
+    "title": {
+      "font_size": 120,
+      "font_color": "white",
+      "font_family": "Impact",
+      "position": "center",
+      "outline_width": 4,
+      "outline_color": "black",
+      "duration": 3,
+      "animation": {
+        "type": "scale_in",
+        "duration": 0.5
+      }
+    },
+    "caption": {
+      "font_size": 80,
+      "font_color": "white",
+      "font_family": "Arial Black",
+      "position": "bottom-center",
+      "outline_width": 3,
+      "outline_color": "black",
+      "duration": 2,
+      "animation": {
+        "type": "slide_up",
+        "duration": 0.3
+      }
+    },
+    "emoji": {
+      "font_size": 150,
+      "position": "center",
+      "duration": 1,
+      "animation": {
+        "type": "bounce",
+        "duration": 0.5
+      }
+    }
+  },
+
+  "image_settings": {
+    "default_duration": 2,
+    "zoom_effects": {
+      "fast_zoom": {
+        "zoom_start": 1.0,
+        "zoom_end": 1.3,
+        "duration": 2,
+        "direction": "in"
+      },
+      "bounce_zoom": {
+        "zoom_start": 1.0,
+        "zoom_middle": 1.2,
+        "zoom_end": 1.0,
+        "duration": 1
+      },
+      "pan_vertical": {
+        "start_position": "top",
+        "end_position": "bottom",
+        "duration": 3
+      }
+    }
+  },
+
+  "audio_settings": {
+    "fade_in": 0.5,
+    "fade_out": 0.5,
+    "volume": 1.0,
+    "normalize_audio": true,
+    "background_music": {
+      "volume": 0.4,
+      "fade_in": 1,
+      "fade_out": 1,
+      "loop": true,
+      "beat_detection": true
+    },
+    "voice_settings": {
+      "volume": 1.2,
+      "normalize": true,
+      "noise_reduction": true
+    }
+  },
+
+  "scene_defaults": {
+    "transition": "fast_fade",
+    "duration": 2,
+    "text_position": "center",
+    "zoom": 1.0
+  },
+
+  "effects": {
+    "beat_sync": {
+      "enabled": true,
+      "intensity": 0.3,
+      "effect_type": "scale"
+    },
+    "color_effects": {
+      "saturation": 1.2,
+      "contrast": 1.1,
+      "brightness": 1.05
+    },
+    "motion": {
+      "stabilization": true,
+      "smooth_transitions": true
+    }
+  },
+
+  "output_settings": {
+    "format": "mp4",
+    "quality_presets": {
+      "high": {
+        "crf": 23,
+        "preset": "medium",
+        "tune": "fastdecode",
+        "maxrate": "2.5M",
+        "bufsize": "2M"
+      },
+      "medium": {
+        "crf": 26,
+        "preset": "faster",
+        "tune": "fastdecode",
+        "maxrate": "2M",
+        "bufsize": "1.5M"
+      },
+      "fast": {
+        "crf": 28,
+        "preset": "veryfast",
+        "tune": "fastdecode",
+        "maxrate": "1.5M",
+        "bufsize": "1M"
+      }
+    },
+    "optimize_for": {
+      "platform": "all",
+      "compression": "balanced",
+      "quality_target": "high",
+      "social_media": {
+        "instagram": {
+          "max_bitrate": "2M",
+          "recommended_bitrate": "1.5M"
+        },
+        "tiktok": {
+          "max_bitrate": "2.5M",
+          "recommended_bitrate": "2M"
+        },
+        "youtube": {
+          "max_bitrate": "3M",
+          "recommended_bitrate": "2M"
+        }
+      }
+    }
+  }
+} 

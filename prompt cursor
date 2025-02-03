@@ -1,0 +1,44 @@
+Atue como um engenheiro de software sênior. Siga rigorosamente as etapas abaixo, sem pular etapas ou alterar a ordem:
+
+Etapa 1: Geração de Soluções Técnicas
+Proponha 5 abordagens técnicas distintas para resolver o seguinte problema de código:
+Problema: procurar em todo @Codebase  codigos nao funcionais, redundantes, com bugs, com falhas, que nao tem utilidade. Depois listar todos encontrados e depois achar a melhor solução para cada um deles 
+
+Regras:
+
+Cada solução deve usar uma estratégia diferente (ex: padrões de projeto, algoritmos alternativos, mudanças de arquitetura).
+
+Priorize simplicidade, eficiência computacional e conformidade com boas práticas de documentação.
+
+Etapa 2: Definição do Critério Técnico
+Defina 1 critério primário para selecionar a melhor solução, baseado em:
+
+simples implementação com baixo risco de quebrar o codigo
+
+Eficiência (ex: complexidade algorítmica, uso de recursos)
+
+Alinhamento com a documentação oficial da linguagem/ferramenta
+Justifique por que esse critério é essencial para o contexto do problema.
+
+Etapa 3: Avaliação Técnica das Soluções
+Analise cada solução contra o critério escolhido, atribuindo uma pontuação de 1 a 5 (5 = melhor).
+Formato:
+
+Solução 1:
+
+Análise Técnica: [Breve explicação dos prós/contras]
+
+Pontuação: [Nota]
+
+Solução 2: [...]
+
+Etapa 4: Implementação da Solução Ótima
+Descreva passo a passo técnico para implementar a solução com maior pontuação.
+
+
+Nota: Em caso de empate, priorize a solução mais fácil de documentar e manter.
+
+
+-----------
+
+Atue como um engenheiro de software referência. Examine o @codebase e busque na internet, utilizando documentações oficiais e discussões em fóruns técnicos, os padrões e recomendações para as bibliotecas e frameworks utilizados. Identifique onde o código diverge dessas práticas e proponha correções que o alinhem com a documentação, justificando cada alteração com as referências encontradas.

@@ -1,0 +1,49 @@
+{
+  "template_id": "voice_template1",
+  "description": "Template para geração de voz usando Fish Speech com configurações otimizadas",
+  "version": "1.0",
+  "metadata": {
+    "model": "fish-speech-1.5",
+    "supported_languages": ["auto", "en", "zh", "ja", "ko", "fr", "de", "ar", "es"],
+    "duration_limits": {
+      "max_audio_length": 1200,
+      "max_reference_length": 30
+    },
+    "parameter_ranges": {
+      "speed": {"min": 0.5, "max": 2.0},
+      "pitch": {"min": -12, "max": 12},
+      "energy": {"min": 0.5, "max": 2.0}
+    }
+  },
+
+  "tempo_max": 900,
+  "parametros": {
+    "language": "auto",
+    "speed": 1.0,
+    "pitch": 0.0,
+    "energy": 1.0,
+    "prompt_text": "",
+    "emotion": null
+  },
+
+  "optimization": {
+    "batch_size": 4,
+    "enable_cuda": true,
+    "compile_model": true,
+    "use_fp16": true,
+    "enable_cache": true,
+    "cache_ttl": 3600
+  },
+
+  "preprocessing": {
+    "normalize_text": true,
+    "add_punctuation": true,
+    "max_chunk_size": 1000
+  },
+
+  "output": {
+    "format": "wav",
+    "sample_rate": 24000,
+    "channels": 1
+  }
+}

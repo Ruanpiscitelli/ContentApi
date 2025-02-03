@@ -35,6 +35,28 @@ O sistema foi pensado para ser altamente escalável – com execução assíncro
 - **Escalabilidade**: Serviços containerizados que podem ser escalados via Kubernetes (com HPA e Cluster Autoscaler) para suportar alta concorrência.
 - **Dashboard Administrativo**: Interface web para gerenciamento dos serviços, upload de modelos, configuração dos endpoints e monitoramento de logs e métricas.
 
+## Atualizações Recentes
+
+### Novas Funcionalidades
+- Suporte a múltiplos schedulers na geração de imagens (DDIM, DPMSolver++, Euler, etc.)
+- Sistema de cache em dois níveis (Redis + VRAM) para otimização de performance
+- Integração com ControlNet para geração de imagens condicionadas
+- Suporte a clonagem de voz com Fish Speech v2
+- Templates pré-configurados para geração de shorts e vídeos verticais
+
+### Otimizações de Performance
+- Implementação de Torch Compile para JIT optimization
+- Suporte a VAE Tiling para processamento de imagens em alta resolução
+- Attention Slicing para otimização de uso de VRAM
+- Gerenciamento dinâmico de recursos GPU com failover automático
+
+### Mudanças na Estrutura
+- Novo diretório `models/cache` para armazenamento local de modelos
+- Templates reorganizados por categoria (imagem/voz/vídeo)
+- Implementação de rate limiting baseado em GPU-hora
+- Sistema de monitoramento com Prometheus/Grafana
+
+
 ---
 
 ## Tecnologias Utilizadas
@@ -96,13 +118,65 @@ meu-servidor-ia/
 │       ├── app.py
 │       ├── Dockerfile
 │       └── requirements.txt
-└── templates/                     # Arquivos JSON com templates para configuração dos pipelines
-    ├── image_template1.json       # Ex.: Template para geração de imagens
-    ├── voice_template1.json       # Ex.: Template para geração/clonagem de voz
-    ├── video_generator_template1.json  # Ex.: Template para geração de vídeo com Hunyuan
-    └── video_editor_template1.json       # Ex.: Template para edição de vídeo a partir de JSON
+└── templates/                     # Templates JSON atualizados por categoria
+    ├── image/
+    │   ├── template1.json
+    │   └── ultrarealistic.json
+    ├── voice/
+    │   ├── template1.json
+    │   └── youtube.json
+    └── video/
+        ├── generator/
+        │   └── template1.json
+        └── editor/
+            ├── template1.json
+            └── shorts.json
+```
 
-Instalação e Configuração
+## Exemplos de Uso Atualizados
+
+### Geração de Imagem com ControlNet
+```bash
+curl -X POST http://localhost/generate-image \
+  -H "Authorization: Bearer YOUR_SECURE_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "prompt": "cidade futurista",
+    "template_id": "image/ultrarealistic",
+    "controlnet": {
+      "model_id": "lllyasviel/control_v11p_sd15_canny",
+      "image_url": "https://example.com/reference.jpg",
+      "preprocessor": "canny"
+    }
+  }'
+```
+
+### Clonagem de Voz com Fish Speech v2
+```bash
+curl -X POST http://localhost/generate-voice \
+  -H "Authorization: Bearer YOUR_SECURE_TOKEN" \
+  -F "texto=Olá, este é um teste de clonagem de voz" \
+  -F "use_voice_clone=true" \
+  -F "sample=@/path/to/reference.wav" \
+  -F "template_id=voice/youtube"
+```
+
+### Geração de Shorts
+```bash
+curl -X POST http://localhost/edit-video \
+  -H "Authorization: Bearer YOUR_SECURE_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "template_id": "video/editor/shorts",
+    "input": "input_video.mp4",
+    "format": "vertical",
+    "resolution": "1080x1920"
+  }'
+```
+
+---
+
+## Instalação e Configuração
 
 Desenvolvimento Local com Docker Compose
 	1.	Clone o repositório:
@@ -138,7 +212,9 @@ kubectl get pods
 kubectl get hpa
 kubectl get nodes
 
-Uso dos Endpoints
+---
+
+## Uso dos Endpoints
 
 Geração de Imagens
 	•	Endpoint: /generate-image
@@ -202,7 +278,9 @@ curl -X POST http://localhost/edit-video \
     }
 }'
 
-Templates
+---
+
+## Templates
 
 Os templates são arquivos JSON armazenados no diretório templates/ e definem os parâmetros dos pipelines.
 Exemplo de image_template1.json:
@@ -219,17 +297,30 @@ Exemplo de image_template1.json:
 
 Os templates para voz, vídeo de geração e edição seguirão estruturas semelhantes, contendo os parâmetros necessários para cada fluxo.
 
-Contribuição
+---
+
+## Contribuição
 
 Contribuições são bem-vindas! Sinta-se à vontade para abrir issues ou enviar pull requests.
 Por favor, mantenha as convenções e a estrutura do projeto ao adicionar novas funcionalidades.
 
-Licença
+---
+
+## Licença
 
 Este projeto está licenciado sob a MIT License.
 
-Contato
+---
+
+## Contato
 
 Para dúvidas ou sugestões, entre em contato através do seu-email@dominio.com.
+
+## Variáveis de Ambiente Adicionais
+```yaml
+TORCH_COMPILE_MODE: "reduce-overhead"  # Otimização JIT
+ENABLE_VAE_TILING: "true"             # Para imagens em alta resolução
+GPU_RATE_LIMIT: "100"                 # Requisições por GPU-hora
+```
 
 This README.md provides a complete description of the project, technology, structure, installation, usage, and further details.

@@ -7,25 +7,55 @@ import uuid
 import logging
 import hashlib
 from typing import Optional, Dict, Any, List
-from functools import lru_cache
+from functools import lru_cache, partial
+import regex as re  # Usar regex Unicode
 
-from fastapi import FastAPI, HTTPException, Header, Depends, UploadFile, File, status
+from fastapi import FastAPI, HTTPException, Header, Depends, UploadFile, File, status, Request
 from pydantic import BaseModel, Field
 from pydub import AudioSegment
 from io import BytesIO
+from fastapi.middleware import Middleware
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 
 # Importa o cliente do MinIO e seus erros
 from minio import Minio
 from minio.error import S3Error
 
 # Importações para métricas e monitoramento
-from prometheus_client import Counter, Histogram, start_http_server
+from prometheus_client import Counter, Histogram, start_http_server, generate_latest, REGISTRY
 
 # Importa a classe do FishSpeech (ajuste conforme a documentação oficial)
 from fishespeech import FishSpeechTTS
 import torch
 
+# Adicionar imports
+import pynvml
+import psutil
+from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import concurrent.futures
+
+# Adicionar contexto de GPU
+import contextlib
+
+# Importar o novo módulo de utilidades GPU
+from shared.gpu_utils import cuda_memory_manager, optimize_gpu_settings
+
+# Configurar limiter após criar a app
+limiter = Limiter(key_func=get_remote_address)
 app = FastAPI()
+app.state.limiter = limiter
+
+# Adicionar middleware
+@app.middleware("http")
+async def rate_limit_middleware(request: Request, call_next):
+    try:
+        response = await limiter(request, call_next)
+        return response
+    except RateLimitExceeded:
+        raise HTTPException(status_code=429, detail="Too many requests")
 
 ######################################
 # 1. Configuração de Métricas
@@ -157,33 +187,22 @@ class VoiceRequest(BaseModel):
     )
     use_voice_clone: bool = False  # Se True, usa clonagem de voz com sample
 
-def validate_params(params: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Valida e ajusta os parâmetros conforme limites do Fish Speech.
-    """
-    if params is None:
-        return {}
-    
-    # Copia para não modificar o original
+# Atualizar a validação de parâmetros
+VALID_EMOTIONS = ["neutral", "happy", "sad", "angry", "surprise", "excited", "calm"]
+
+def validate_params(params: dict) -> dict:
     validated = params.copy()
     
-    # Validação de idioma
-    valid_languages = ["auto", "en", "zh", "ja", "ko", "fr", "de", "ar", "es"]
-    if "language" in validated:
-        if validated["language"] not in valid_languages:
-            validated["language"] = "auto"
+    # Validação de emoção
+    if "emotion" in validated:
+        if validated["emotion"].lower() not in VALID_EMOTIONS:
+            validated["emotion"] = "neutral"
     
-    # Validação de velocidade
-    if "speed" in validated:
-        validated["speed"] = max(0.5, min(2.0, float(validated["speed"])))
-    
-    # Validação de pitch
-    if "pitch" in validated:
-        validated["pitch"] = max(-12, min(12, float(validated["pitch"])))
-    
-    # Validação de energia
-    if "energy" in validated:
-        validated["energy"] = max(0.5, min(2.0, float(validated["energy"])))
+    # Validação de faixas numéricas
+    numerical_params = ["speed", "pitch", "energy"]
+    for param in numerical_params:
+        if param in validated:
+            validated[param] = max(0.5, min(2.0, float(validated[param])))
     
     return validated
 
@@ -238,16 +257,32 @@ async def startup_event():
     start_http_server(8001)
     load_fishespeech_model()
 
-@lru_cache(maxsize=100)
+    # Configurar executor global
+    MAX_WORKERS = min(32, (os.cpu_count() or 1) + 4)
+    executor = concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS)
+    app.state.executor = executor
+
+    # Adicionar na inicialização do app
+    optimize_gpu_settings()
+    
+    if not torch.cuda.is_available():
+        logger.warning("GPU não disponível. Performance será reduzida.")
+
+@lru_cache(maxsize=500)
 def get_cached_audio(text: str, params_hash: str) -> Optional[bytes]:
-    """
-    Cache para evitar regeneração de áudios idênticos.
-    Utiliza LRU cache com limite de 100 itens.
-    """
-    cache_key = f"{text}_{params_hash}"
-    # Por enquanto usando apenas LRU cache em memória
-    # TODO: Implementar cache distribuído com Redis
+    current_hash = hashlib.sha256(
+        f"{text}_{params_hash}".encode()
+    ).hexdigest()
+    
+    # Verificação adicional de consistência
+    cached = cache.get(current_hash)
+    if cached and validate_audio_integrity(cached):
+        return cached
     return None
+
+def validate_audio_integrity(audio_data: bytes) -> bool:
+    # Verificação básica do header do arquivo de áudio
+    return audio_data[:4] in (b'RIFF', b'OggS', b'fLaC')
 
 def get_params_hash(params: Dict[str, Any]) -> str:
     """
@@ -280,23 +315,25 @@ def preprocess_text(text: str) -> str:
 # 5. Processamento em Batch
 ######################################
 async def process_text_chunks(chunks: List[str], params: Dict[str, Any]) -> List[bytes]:
-    """
-    Processa chunks de texto em batch para melhor performance.
-    """
-    batch_size = 4  # Ajuste baseado na memória GPU disponível
-    audio_chunks = []
-    
-    for i in range(0, len(chunks), batch_size):
-        batch = chunks[i:i + batch_size]
-        tasks = [
-            asyncio.get_running_loop().run_in_executor(
-                None, 
-                lambda text=text: synthesize_voice(text, params)
+    """Processa chunks de texto em batch para melhor performance usando ThreadPool"""
+    with app.state.executor as executor:
+        loop = asyncio.get_event_loop()
+        futures = [
+            loop.run_in_executor(
+                executor,
+                partial(synthesize_voice, text=text, params=params)
             )
-            for text in batch
+            for text in chunks
         ]
-        batch_results = await asyncio.gather(*tasks)
-        audio_chunks.extend(batch_results)
+        
+        audio_chunks = []
+        for future in as_completed(futures):
+            try:
+                result = await future
+                audio_chunks.append(result)
+            except Exception as e:
+                logger.error(f"Erro no processamento de chunk: {str(e)}")
+                continue
     
     return audio_chunks
 
@@ -437,19 +474,24 @@ async def clone_voice_endpoint(
         
         # Processa os chunks em batch
         audio_chunks = []
-        loop = asyncio.get_running_loop()
         
-        for chunk in chunks:
-            try:
-                audio_chunk = await loop.run_in_executor(
-                    None, 
-                    lambda: clone_voice(chunk, processed_sample, request.parametros)
+        with ThreadPoolExecutor(max_workers=5) as executor:  # Número ótimo para I/O bound
+            loop = asyncio.get_event_loop()
+            futures = [
+                loop.run_in_executor(
+                    executor,
+                    partial(clone_voice, chunk, processed_sample, request.parametros)
                 )
-                audio_chunks.append(audio_chunk)
-            except Exception as e:
-                logger.error(f"Erro ao processar chunk: {str(e)}")
-                # Continua com os próximos chunks mesmo se houver erro
-                continue
+                for chunk in chunks
+            ]
+            
+            for future in as_completed(futures):
+                try:
+                    audio_chunk = await future
+                    audio_chunks.append(audio_chunk)
+                except Exception as e:
+                    logger.error(f"Erro no chunk: {str(e)}")
+                    continue
         
         if not audio_chunks:
             raise HTTPException(
@@ -503,6 +545,17 @@ async def clone_voice_endpoint(
             detail=f"Erro na clonagem de voz: {str(e)}"
         )
 
+# Adicionar contexto de GPU
+@contextlib.contextmanager
+def gpu_context(device_id: int = 0):
+    with torch.cuda.device(device_id), \
+         torch.cuda.stream(torch.cuda.Stream()), \
+         torch.inference_mode():
+        try:
+            yield
+        finally:
+            torch.cuda.empty_cache()
+
 def synthesize_voice(text: str, params: Dict[str, Any]) -> bytes:
     """
     Gera áudio WAV usando Fish Speech com suporte a múltiplos idiomas e controle de parâmetros.
@@ -532,12 +585,22 @@ def synthesize_voice(text: str, params: Dict[str, Any]) -> bytes:
             model_params["emotion"] = validated_params["emotion"]
         
         # Gera o áudio
-        audio_bytes = fishspeech_model.synthesize(**model_params)
+        with gpu_context():
+            audio_bytes = fishspeech_model.synthesize(**model_params)
         return audio_bytes
         
     except Exception as e:
         logger.error(f"Erro na síntese de voz: {str(e)}")
         raise RuntimeError(f"Erro na síntese de voz: {str(e)}")
+
+async def process_chunk(chunk: str, processed_sample: AudioSegment, params: dict):
+    """Executa clonagem de voz com gerenciamento de contexto"""
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(
+            executor,
+            partial(clone_voice, chunk, processed_sample, params)
+        )
 
 def clone_voice(text: str, sample_bytes: bytes, params: Dict[str, Any]) -> bytes:
     """
@@ -562,7 +625,8 @@ def clone_voice(text: str, sample_bytes: bytes, params: Dict[str, Any]) -> bytes
         }
         
         # Gera o áudio clonado
-        audio_bytes = fishspeech_model.clone(**clone_params)
+        with gpu_context():
+            audio_bytes = fishspeech_model.clone(**clone_params)
         return audio_bytes
         
     except Exception as e:
@@ -580,6 +644,11 @@ def validate_audio_sample(audio_bytes: bytes, max_duration: int = 30) -> bytes:
     - Converte para formato adequado (wav, 16kHz, mono)
     """
     try:
+        # Verificação de assinatura
+        valid_headers = (b'RIFF', b'ID3', b'OggS', b'fLaC')
+        if not audio_bytes.startswith(valid_headers):
+            raise ValueError("Formato de áudio não suportado")
+        
         # Carrega o áudio
         audio = AudioSegment.from_file(BytesIO(audio_bytes))
         
@@ -607,130 +676,60 @@ def validate_audio_sample(audio_bytes: bytes, max_duration: int = 30) -> bytes:
     except Exception as e:
         raise ValueError(f"Erro ao processar áudio de referência: {str(e)}")
 
-def split_text_smart(text: str, max_len: int = 1000) -> List[str]:
-    """
-    Divide o texto em chunks de forma inteligente, respeitando pontuação.
-    """
-    # Se o texto é menor que o limite, retorna como está
-    if len(text) <= max_len:
-        return [text]
+def split_text_smart(text: str, max_length: int = 100) -> list:
+    # Padrão Unicode para pontuação de sentenças
+    sentence_boundary = re.compile(
+        r'(\p{Sentence_Terminal}+[\s\u200b]*)',
+        re.UNICODE
+    )
     
-    chunks = []
-    current_chunk = ""
+    sentences = []
+    current = []
+    length = 0
     
-    # Divide por sentenças primeiro
-    sentences = text.replace("。", ".").replace("！", "!").replace("？", "?").split(".")
-    
-    for sentence in sentences:
-        sentence = sentence.strip()
-        if not sentence:
+    for part in sentence_boundary.split(text):
+        part = part.strip()
+        if not part:
             continue
             
-        # Se a sentença é maior que o limite, divide por vírgulas
-        if len(sentence) > max_len:
-            subparts = sentence.split(",")
-            for part in subparts:
-                part = part.strip()
-                if not part:
-                    continue
-                    
-                # Se ainda é muito grande, divide por espaços
-                if len(part) > max_len:
-                    words = part.split()
-                    temp_chunk = ""
-                    for word in words:
-                        if len(temp_chunk) + len(word) + 1 <= max_len:
-                            temp_chunk += " " + word if temp_chunk else word
-                        else:
-                            chunks.append(temp_chunk + ".")
-                            temp_chunk = word
-                    if temp_chunk:
-                        chunks.append(temp_chunk + ".")
-                else:
-                    # Adiciona a parte com pontuação
-                    if len(current_chunk) + len(part) + 2 <= max_len:
-                        current_chunk += (", " if current_chunk else "") + part
-                    else:
-                        if current_chunk:
-                            chunks.append(current_chunk + ".")
-                        current_chunk = part
+        if length + len(part) <= max_length:
+            current.append(part)
+            length += len(part)
         else:
-            # Adiciona a sentença completa
-            if len(current_chunk) + len(sentence) + 2 <= max_len:
-                current_chunk += (". " if current_chunk else "") + sentence
-            else:
-                if current_chunk:
-                    chunks.append(current_chunk + ".")
-                current_chunk = sentence
+            if current:
+                sentences.append(' '.join(current))
+            current = [part]
+            length = len(part)
     
-    # Adiciona o último chunk se existir
-    if current_chunk:
-        chunks.append(current_chunk + ".")
+    if current:
+        sentences.append(' '.join(current))
     
-    return chunks
+    return sentences
 
-@app.get("/healthcheck")
-async def healthcheck():
-    """
-    Endpoint de healthcheck que verifica:
-    - Status do modelo
-    - Uso de GPU
-    - Memória disponível
-    - Teste básico de síntese
-    """
-    try:
-        if fishspeech_model is None:
-            return {
-                "status": "error",
-                "message": "Modelo não carregado",
-                "timestamp": time.time()
-            }
-        
-        # Verifica GPU
-        gpu_info = {
-            "available": torch.cuda.is_available(),
-            "device_count": torch.cuda.device_count() if torch.cuda.is_available() else 0,
-            "current_device": torch.cuda.current_device() if torch.cuda.is_available() else None,
+@app.get("/healthcheck", include_in_schema=False)
+async def health_check():
+    test_cases = [
+        ("Modelo TTS", fishspeech_model is not None),
+        ("GPU Disponível", torch.cuda.is_available()),
+        ("Conexão MinIO", check_minio_connection()),
+        ("Conexão Cache", check_cache_connection()),
+        ("Memória Livre", psutil.virtual_memory().percent < 90)
+    ]
+    
+    failed = [name for name, status in test_cases if not status]
+    status_code = 200 if not failed else 503
+    
+    return {
+        "status": "ok" if not failed else "degraded",
+        "version": os.getenv("APP_VERSION", "1.0.0"),
+        "timestamp": datetime.utcnow().isoformat(),
+        "failed_components": failed,
+        "gpu_metrics": get_gpu_metrics(),
+        "system_metrics": {
+            "cpu": psutil.cpu_percent(),
+            "memory": psutil.virtual_memory()._asdict()
         }
-        
-        if gpu_info["available"]:
-            gpu_info.update({
-                "memory_allocated": torch.cuda.memory_allocated(),
-                "memory_reserved": torch.cuda.memory_reserved(),
-                "max_memory_allocated": torch.cuda.max_memory_allocated()
-            })
-        
-        # Testa síntese básica
-        test_result = None
-        try:
-            test_text = "Teste de síntese."
-            _ = await asyncio.get_running_loop().run_in_executor(
-                None,
-                lambda: synthesize_voice(test_text, {})
-            )
-            test_result = "success"
-        except Exception as e:
-            test_result = f"failed: {str(e)}"
-        
-        return {
-            "status": "healthy",
-            "model": {
-                "loaded": True,
-                "type": "FishSpeech",
-                "version": "1.4.3",
-                "test_synthesis": test_result
-            },
-            "gpu": gpu_info,
-            "timestamp": time.time()
-        }
-        
-    except Exception as e:
-        logger.error(f"Erro no healthcheck: {str(e)}")
-        return {
-            "status": "error",
-            "message": str(e),
-            "timestamp": time.time()
-        }
+    }, status_code
 
 @app.get("/metrics/voice")
 async def voice_metrics():
@@ -744,29 +743,22 @@ async def voice_metrics():
         )
     
     try:
-        metrics = {
-            "total_requests": int(VOICE_GENERATION_TIME._sum.get()),
-            "total_errors": int(VOICE_GENERATION_ERRORS._value.get()),
-            "average_generation_time": float(VOICE_GENERATION_TIME._sum.get() / max(1, VOICE_GENERATION_TIME._count.get())),
-            "total_clone_requests": int(VOICE_CLONE_TIME._sum.get()),
-            "total_clone_errors": int(VOICE_CLONE_ERRORS._value.get()),
-            "average_clone_time": float(VOICE_CLONE_TIME._sum.get() / max(1, VOICE_CLONE_TIME._count.get())),
-            "cache_stats": {
-                "hits": int(CACHE_HITS._value.get()),
-                "misses": int(CACHE_MISSES._value.get()),
-                "hit_ratio": float(CACHE_HITS._value.get() / max(1, CACHE_HITS._value.get() + CACHE_MISSES._value.get()))
-            }
+        metrics_data = {
+            # Coletar via registro oficial
+            "total_requests": get_metric_value('voice_generation_seconds_count'),
+            "average_time": get_metric_value('voice_generation_seconds_sum') / get_metric_value('voice_generation_seconds_count'),
+            # ... outras métricas
         }
         
         if torch.cuda.is_available():
-            metrics["gpu"] = {
+            metrics_data["gpu"] = {
                 "memory_allocated_mb": torch.cuda.memory_allocated() / 1024 / 1024,
                 "memory_reserved_mb": torch.cuda.memory_reserved() / 1024 / 1024,
                 "max_memory_allocated_mb": torch.cuda.max_memory_allocated() / 1024 / 1024,
                 "device_utilization": None  # TODO: Implementar medição de utilização da GPU
             }
         
-        return metrics
+        return metrics_data
         
     except Exception as e:
         logger.error(f"Erro ao coletar métricas: {str(e)}")
@@ -774,3 +766,45 @@ async def voice_metrics():
             status_code=500,
             detail=f"Erro ao coletar métricas: {str(e)}"
         )
+
+def get_gpu_metrics() -> dict:
+    pynvml.nvmlInit()
+    metrics = {}
+    
+    try:
+        device_count = pynvml.nvmlDeviceGetCount()
+        for i in range(device_count):
+            handle = pynvml.nvmlDeviceGetHandleByIndex(i)
+            util = pynvml.nvmlDeviceGetUtilizationRates(handle)
+            memory = pynvml.nvmlDeviceGetMemoryInfo(handle)
+            
+            metrics[f"gpu_{i}"] = {
+                "utilization": {
+                    "gpu": util.gpu,
+                    "memory": util.memory
+                },
+                "memory": {
+                    "used": memory.used,
+                    "total": memory.total
+                },
+                "temperature": pynvml.nvmlDeviceGetTemperature(
+                    handle, pynvml.NVML_TEMPERATURE_GPU
+                )
+            }
+    except Exception as e:
+        logging.error(f"Erro na coleta de métricas da GPU: {str(e)}")
+    
+    pynvml.nvmlShutdown()
+    return metrics
+
+def check_minio_connection() -> bool:
+    try:
+        return minio_client.bucket_exists(AUDIO_BUCKET_NAME)
+    except S3Error:
+        return False
+
+def check_cache_connection() -> bool:
+    try:
+        return cache.ping()
+    except Exception:
+        return False

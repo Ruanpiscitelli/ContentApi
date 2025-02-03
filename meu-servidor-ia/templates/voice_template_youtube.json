@@ -1,0 +1,122 @@
+{
+  "template_id": "voice_template_youtube",
+  "description": "Template para narração dinâmica de vídeos do YouTube usando Fish Speech",
+  "version": "1.0",
+  "metadata": {
+    "model": "fish-speech-1.5",
+    "supported_languages": ["auto", "en", "zh", "ja", "ko", "fr", "de", "ar", "es"],
+    "duration_limits": {
+      "max_audio_length": 1800,
+      "max_reference_length": 30,
+      "min_segment_length": 2,
+      "max_segment_length": 15
+    },
+    "parameter_ranges": {
+      "speed": {"min": 0.8, "max": 1.5},
+      "pitch": {"min": -6, "max": 6},
+      "energy": {"min": 0.7, "max": 1.5}
+    },
+    "emotions": {
+      "available": [
+        "neutral",
+        "excited",
+        "enthusiastic",
+        "serious",
+        "friendly",
+        "dramatic",
+        "professional"
+      ],
+      "transitions": {
+        "enabled": true,
+        "smoothing": 0.3
+      }
+    }
+  },
+
+  "tempo_max": 1800,
+  "parametros": {
+    "language": "auto",
+    "base_config": {
+      "speed": 1.2,
+      "pitch": 1.0,
+      "energy": 1.2,
+      "emotion": "enthusiastic"
+    },
+    "dynamic_adjustments": {
+      "questions": {
+        "pitch": 2.0,
+        "speed": 0.9,
+        "energy": 1.3,
+        "emotion": "friendly"
+      },
+      "emphasis": {
+        "pitch": 1.5,
+        "speed": 1.1,
+        "energy": 1.4,
+        "emotion": "excited"
+      },
+      "conclusion": {
+        "pitch": 0.0,
+        "speed": 0.95,
+        "energy": 1.1,
+        "emotion": "professional"
+      },
+      "call_to_action": {
+        "pitch": 2.5,
+        "speed": 1.3,
+        "energy": 1.5,
+        "emotion": "enthusiastic"
+      }
+    },
+    "prompt_text": "Bem-vindo ao canal! Hoje vamos falar sobre...",
+    "style_reference": "youtuber_energetic"
+  },
+
+  "optimization": {
+    "batch_size": 4,
+    "enable_cuda": true,
+    "compile_model": true,
+    "use_fp16": true,
+    "enable_cache": true,
+    "cache_ttl": 7200,
+    "dynamic_batch_size": true,
+    "priority_processing": true
+  },
+
+  "preprocessing": {
+    "normalize_text": true,
+    "add_punctuation": true,
+    "max_chunk_size": 1000,
+    "segment_markers": {
+      "emphasis": ["!", "**", "CAPS"],
+      "question": ["?"],
+      "pause": [",", "...", ";"],
+      "break": ["\n", "\n\n"]
+    },
+    "text_analysis": {
+      "detect_emphasis": true,
+      "detect_questions": true,
+      "detect_emotions": true,
+      "smart_pausing": true
+    }
+  },
+
+  "output": {
+    "format": "wav",
+    "sample_rate": 24000,
+    "channels": 1,
+    "post_processing": {
+      "normalize_volume": true,
+      "remove_silence": true,
+      "add_breathing": {
+        "enabled": true,
+        "natural_spacing": true,
+        "intensity": 0.3
+      },
+      "enhance_clarity": {
+        "enabled": true,
+        "level": "moderate"
+      }
+    }
+  }
+} 

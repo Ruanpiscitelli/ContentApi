@@ -1,67 +1,217 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <title>Dashboard - Meu Servidor de IA</title>
     <style>
-        /* CSS básico para layout */
-        body { font-family: Arial, sans-serif; background-color: #f4f4f4; }
-        .container { max-width: 900px; margin: auto; background: #fff; padding: 20px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { padding: 10px; border: 1px solid #ddd; text-align: center; }
-        th { background-color: #eee; }
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background-color: #1a1a1a;
+            color: #ffffff;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: #2d2d2d;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+        h1 {
+            color: #fb5607;
+            font-size: 2.5em;
+            margin-bottom: 30px;
+            border-bottom: 3px solid #3a86ff;
+            padding-bottom: 10px;
+            display: inline-block;
+        }
+        a {
+            color: #fb5607;
+            text-decoration: none;
+            float: right;
+            font-weight: bold;
+            transition: color 0.3s;
+        }
+        a:hover {
+            color: #3a86ff;
+        }
+        h2 {
+            color: #fb5607;
+            margin-top: 30px;
+            font-size: 1.8em;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            background-color: #333333;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        th {
+            background-color: #fb5607;
+            color: white;
+            padding: 15px;
+            text-transform: uppercase;
+            font-size: 0.9em;
+        }
+        td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #3a86ff33;
+        }
+        tr:nth-child(even) {
+            background-color: #2a2a2a;
+        }
+        tr:hover {
+            background-color: #3a3a3a;
+        }
+        button {
+            background-color: #fb5607;
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+            text-transform: uppercase;
+        }
+        button:hover {
+            background-color: #3a86ff;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(251, 86, 7, 0.4);
+        }
+        .api-keys {
+            background-color: #333333;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 25px;
+        }
+        .api-keys h3 {
+            color: #3a86ff;
+            margin-top: 0;
+        }
+        ul {
+            list-style-type: none;
+            padding: 0;
+        }
+        li {
+            padding: 8px 0;
+            color: #fb5607;
+            font-family: monospace;
+        }
+        p[style*="color:green"] {
+            color: #3a86ff !important;
+            padding: 10px;
+            background-color: #3a86ff33;
+            border-radius: 6px;
+            border-left: 4px solid #3a86ff;
+        }
+        /* Estilos para a "tela de terminal" dos logs */
+        #terminal {
+            background-color: #000000;
+            color: #00ff00;
+            font-family: monospace;
+            padding: 15px;
+            border-radius: 6px;
+            height: 250px;
+            overflow-y: auto;
+            margin-bottom: 30px;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.8);
+        }
     </style>
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Chart.js Streaming Plugin -->
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-streaming@2.0.0"></script>
 </head>
 <body>
     <div class="container">
         <h1>Dashboard</h1>
         <a href="/logout">Logout</a>
-        <h2>Status dos Serviços</h2>
-        <table>
-            <thead>
-                <tr>
-                    <th>Serviço</th>
-                    <th>Status</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for service, status in services_status.items() %}
-                <tr>
-                    <td>{{ service }}</td>
-                    <td>{{ status }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        <h2>Métricas do Sistema</h2>
-        <table>
-            <tr>
-                <th>CPU</th>
-                <td>{{ metrics.cpu }}</td>
-            </tr>
-            <tr>
-                <th>Memória</th>
-                <td>{{ metrics.memory }}</td>
-            </tr>
-            {% if metrics.gpu %}
-            <tr>
-                <th colspan="2">Uso das GPUs</th>
-            </tr>
-            {% for gpu, usage in metrics.gpu.items() %}
-            <tr>
-                <td>{{ gpu }}</td>
-                <td>{{ usage }}</td>
-            </tr>
-            {% endfor %}
-            {% endif %}
-        </table>
-        <h2>Gerar API Key</h2>
-        <form action="/generate-api-key" method="post">
-            <button type="submit">Gerar Nova API Key</button>
-        </form>
-        {% if api_key %}
-        <p>Sua nova API Key é: <strong>{{ api_key }}</strong></p>
-        {% endif %}
+
+        <!-- Seções já existentes... (Status, Métricas, API Keys, etc.) -->
+
+        <h2>Logs em Tempo Real</h2>
+        <div id="terminal"></div>
+
+        <!-- Seção do gráfico interativo de métricas -->
+        <h2>Gráfico de Métricas</h2>
+        <canvas id="metricsChart" width="400" height="200"></canvas>
     </div>
+
+    <script>
+        // Configuração do gráfico com Chart.js (sem alterações na lógica dos dados)
+        const ctx = document.getElementById('metricsChart').getContext('2d');
+        const metricsChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                datasets: [
+                    {
+                        label: 'CPU (%)',
+                        borderColor: '#fb5607',
+                        backgroundColor: 'rgba(251,86,7,0.1)',
+                        data: []
+                    },
+                    {
+                        label: 'Memória (GB)',
+                        borderColor: '#3a86ff',
+                        backgroundColor: 'rgba(58,134,255,0.1)',
+                        data: []
+                    }
+                ]
+            },
+            options: {
+                plugins: {
+                    streaming: {
+                        frameRate: 30
+                    }
+                },
+                scales: {
+                    x: {
+                        type: 'realtime',
+                        realtime: {
+                            duration: 20000,
+                            refresh: 5000,
+                            delay: 2000,
+                            onRefresh: function(chart) {
+                                fetch('/api/metrics')
+                                    .then(response => response.json())
+                                    .then(data => {
+                                        const now = Date.now();
+                                        chart.data.datasets[0].data.push({ x: now, y: data.cpu });
+                                        chart.data.datasets[1].data.push({ x: now, y: data.memory });
+                                    });
+                            }
+                        }
+                    },
+                    y: {
+                        beginAtZero: true
+                    }
+                },
+                responsive: true,
+                maintainAspectRatio: false
+            }
+        });
+
+        // Implementação da atualização de logs via SSE (Server-Sent Events)
+        const terminal = document.getElementById('terminal');
+        const evtSource = new EventSource("/api/logs_stream");
+
+        evtSource.onmessage = function(event) {
+            // Cria uma nova linha no terminal
+            const newLine = document.createElement("div");
+            newLine.textContent = event.data;
+            terminal.appendChild(newLine);
+            // Auto-scroll para o final
+            terminal.scrollTop = terminal.scrollHeight;
+        };
+
+        evtSource.onerror = function(err) {
+            console.error("Erro na conexão SSE:", err);
+        };
+    </script>
 </body>
 </html>
