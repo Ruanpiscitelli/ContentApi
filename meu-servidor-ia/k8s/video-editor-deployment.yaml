@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: video-editor-deployment
+  labels:
+    app: video-editor
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: video-editor
+  template:
+    metadata:
+      labels:
+        app: video-editor
+    spec:
+      containers:
+      - name: video-editor
+        image: ruanpiscitelli/media-api:latest  # Substitua pelo endereço real da sua imagem
+        ports:
+        - containerPort: 8000
+        env:
+        - name: API_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: api-secrets
+              key: apiToken
+      # Normalmente, o serviço de edição de vídeo não requer GPU, a menos que a implementação assim o demande.

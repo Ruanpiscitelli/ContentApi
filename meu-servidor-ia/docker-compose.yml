@@ -1,0 +1,160 @@
+version: "3.8"
+
+services:
+  ###########################################################
+  # Proxy reverso (Nginx)
+  ###########################################################
+  nginx:
+    image: nginx:latest
+    container_name: proxy_nginx
+    # Recomenda-se usar volumes nomeados ou bind mounts para configs (ex: /etc/nginx)
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "80:80"
+    depends_on:
+      - dashboard
+      - image_generator
+      - voice_generator
+      - video_generator
+      - video_editor
+    restart: always
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  ###########################################################
+  # Serviço do Dashboard
+  ###########################################################
+  dashboard:
+    build: ./dashboard
+    container_name: dashboard_service
+    ports:
+      - "8000:8000"
+    environment:
+      # Ajuste para usar .env se quiser:
+      # DASHBOARD_USERNAME: ${DASHBOARD_USERNAME}
+      # DASHBOARD_PASSWORD: ${DASHBOARD_PASSWORD}
+      - DASHBOARD_USERNAME=admin
+      - DASHBOARD_PASSWORD=your_dashboard_password
+    restart: always
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/healthcheck"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  ###########################################################
+  # Serviço de geração de imagens (SDXL/Flux + LoRAs)
+  ###########################################################
+  image_generator:
+    build: ./services/image_generator
+    container_name: image_generator_service
+    # Você pode mapear a porta interna 8000 para outra porta externa se quiser
+    ports:
+      - "8001:8000"
+    environment:
+      - API_TOKEN=your_api_token_here
+      # Variáveis extras (GPU, debug, logs etc.)
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=all
+    # Indica que esse contêiner deve ter acesso a todas as GPUs
+    gpus: all
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              # Se quiser limitar a apenas 1 GPU, use count: 1.
+              # Para usar todas, use count: all (nem todas as versões do Docker suportam).
+              count: all
+              capabilities: [gpu]
+    restart: always
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/healthcheck"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  ###########################################################
+  # Serviço de geração/clonagem de voz (FishSpeech)
+  ###########################################################
+  voice_generator:
+    build: ./services/voice_generator
+    container_name: voice_generator_service
+    ports:
+      - "8002:8000"
+    environment:
+      - API_TOKEN=your_api_token_here
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=all
+    gpus: all
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    restart: always
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/healthcheck"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  ###########################################################
+  # Serviço de geração de vídeo (Hunyuan)
+  ###########################################################
+  video_generator:
+    build: ./services/video_generator
+    container_name: video_generator_service
+    ports:
+      - "8003:8000"
+    environment:
+      - API_TOKEN=your_api_token_here
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=all
+    gpus: all
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    restart: always
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/healthcheck"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  ###########################################################
+  # Serviço de edição de vídeo (JSON, estilo json2video)
+  ###########################################################
+  video_editor:
+    build: ./services/video_editor
+    container_name: video_editor_service
+    ports:
+      - "8004:8000"
+    environment:
+      - API_TOKEN=your_api_token_here
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=all
+    gpus: all
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    restart: always
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/healthcheck"]
+      interval: 30s
+      timeout: 5s
+      retries: 3

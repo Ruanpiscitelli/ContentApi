@@ -1,0 +1,54 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: content-api-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /$1
+    # Se estiver usando Cert-Manager para SSL, adicione as anotações necessárias
+spec:
+  rules:
+  - host: contentapi.ruanpiscitelli.com  # Substitua pelo seu domínio real
+    http:
+      paths:
+      - path: /dashboard/(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: dashboard-service
+            port:
+              number: 8000
+      - path: /generate-image/(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: image-generator-service
+            port:
+              number: 8000
+      - path: /generate-voice/(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: voice-generator-service
+            port:
+              number: 8000
+      - path: /clone-voice/(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: voice-generator-service
+            port:
+              number: 8000
+      - path: /generate-video/(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: video-generator-service
+            port:
+              number: 8000
+      - path: /edit-video/(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: video-editor-service
+            port:
+              number: 8000

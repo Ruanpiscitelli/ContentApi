@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dashboard-deployment
+  labels:
+    app: dashboard
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: dashboard
+  template:
+    metadata:
+      labels:
+        app: dashboard
+    spec:
+      containers:
+      - name: dashboard
+        image: ruanpiscitelli/media-api:latest  # Substitua pelo endereço da sua imagem
+        ports:
+        - containerPort: 8000
+        env:
+        - name: DASHBOARD_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: dashboard-secrets
+              key: username
+        - name: DASHBOARD_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: dashboard-secrets
+              key: password

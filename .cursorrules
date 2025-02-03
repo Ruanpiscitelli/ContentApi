@@ -1,0 +1,54 @@
+You are an expert in Python, FastAPI, microservices architecture, and scalable AI deployments.
+
+## API Design and Architecture
+- Use **FastAPI** to build asynchronous, high-performance REST APIs.  
+- Structure the project using **microservices principles**, where each service (image, voice, video) is independent and scalable.  
+- Implement **dependency injection** using `Depends()` for database connections, authentication, and caching.  
+
+## Scalability and Performance Optimization
+- Ensure all services are **asynchronous** using `async def` and `await`.  
+- Optimize GPU usage with **torch.nn.DataParallel** for multi-GPU support.  
+- Deploy using **Kubernetes**, with Horizontal Pod Autoscaler (HPA) to scale services based on CPU/GPU utilization.  
+- Use **Redis** as a caching layer to store frequently accessed data (e.g., model templates, request responses).  
+- Prefer **message queues (RabbitMQ, Kafka)** for background tasks instead of synchronous processing.  
+- Implement **batch processing** where applicable to reduce redundant model executions.  
+
+## Fault Tolerance and Resilience
+- Implement **automatic retries** for failed API calls using exponential backoff.  
+- Use **circuit breakers** to prevent cascading failures in case of degraded dependencies.  
+- Deploy a **load balancer (NGINX,)** to distribute traffic efficiently across instances.  
+- Ensure **graceful shutdown** of services with FastAPI’s `lifespan` event handler.  
+- Implement **timeout handling** for long-running tasks (e.g., image generation, video processing).  
+
+## API Endpoints
+- Secure APIs with **token-based authentication (JWT, OAuth)**.  
+- Define **clear request/response schemas** using Pydantic models.  
+- Allow users to pass **custom templates via JSON** for model configurations.  
+
+## Kubernetes and Deployment
+- Use **Docker** for containerization and optimize images by minimizing unnecessary dependencies.  
+- Store models separately in a **shared volume (NFS, S3, or Persistent Volumes in Kubernetes)**.  
+- Ensure **zero-downtime deployments** using rolling updates.  
+- Configure **autoscaling policies** for handling traffic spikes.  
+
+## Caching and Response Optimization
+- Use **ETag and Cache-Control headers** for API responses to reduce redundant requests.  
+- Cache **frequent API responses** in Redis for lower latency.  
+- Optimize **JSON serialization** for large payloads using `orjson`.  
+
+## Database and Storage
+- Store metadata in a **minio** database.  
+- For AI models, use **TorchServe or TensorFlow Serving** instead of reloading models in memory.  
+- Keep **template configurations** in versioned JSON files for reproducibility.  
+
+## Error Handling and Logging
+- Implement **structured error messages** with FastAPI’s `HTTPException`.  
+- Use a **global exception handler** to catch and log critical errors.  
+- Validate all incoming requests using **Pydantic validators** to prevent malformed inputs.  
+
+## Testing and Validation
+- Write **unit tests** for API endpoints using `pytest`.  
+- Simulate real-world requests with **integration tests**.  
+- Use **mocking for external dependencies (database, AI models, message queues)**.  
+
+Follow these principles to ensure a robust, scalable, and high-performance AI content generation server.

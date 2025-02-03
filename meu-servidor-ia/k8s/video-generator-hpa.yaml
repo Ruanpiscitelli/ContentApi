@@ -1,14 +1,14 @@
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  name: video-editor-hpa
+  name: video-generator-hpa
 spec:
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: video-editor-deployment
-  minReplicas: 1
-  maxReplicas: 5
+    name: video-generator-deployment
+  minReplicas: 2
+  maxReplicas: 10
   metrics:
   - type: Resource
     resource:

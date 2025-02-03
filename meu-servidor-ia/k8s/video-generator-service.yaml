@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: video-generator-service
+  labels:
+    app: video-generator
+spec:
+  selector:
+    app: video-generator
+  ports:
+    - protocol: TCP
+      port: 8000
+      targetPort: 8000
+  type: ClusterIP

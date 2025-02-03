@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Dashboard - Meu Servidor de IA</title>
+    <style>
+        /* CSS básico para layout */
+        body { font-family: Arial, sans-serif; background-color: #f4f4f4; }
+        .container { max-width: 900px; margin: auto; background: #fff; padding: 20px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { padding: 10px; border: 1px solid #ddd; text-align: center; }
+        th { background-color: #eee; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Dashboard</h1>
+        <a href="/logout">Logout</a>
+        <h2>Status dos Serviços</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Serviço</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for service, status in services_status.items() %}
+                <tr>
+                    <td>{{ service }}</td>
+                    <td>{{ status }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <h2>Métricas do Sistema</h2>
+        <table>
+            <tr>
+                <th>CPU</th>
+                <td>{{ metrics.cpu }}</td>
+            </tr>
+            <tr>
+                <th>Memória</th>
+                <td>{{ metrics.memory }}</td>
+            </tr>
+            {% if metrics.gpu %}
+            <tr>
+                <th colspan="2">Uso das GPUs</th>
+            </tr>
+            {% for gpu, usage in metrics.gpu.items() %}
+            <tr>
+                <td>{{ gpu }}</td>
+                <td>{{ usage }}</td>
+            </tr>
+            {% endfor %}
+            {% endif %}
+        </table>
+        <h2>Gerar API Key</h2>
+        <form action="/generate-api-key" method="post">
+            <button type="submit">Gerar Nova API Key</button>
+        </form>
+        {% if api_key %}
+        <p>Sua nova API Key é: <strong>{{ api_key }}</strong></p>
+        {% endif %}
+    </div>
+</body>
+</html>
