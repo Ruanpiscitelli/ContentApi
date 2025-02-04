@@ -1,46 +1,80 @@
-FROM python:3.10-slim
+# syntax=docker/dockerfile:1
 
-# Configuração de variáveis de ambiente para otimização
-ENV PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1 \
+# Stage de build
+FROM python:3.10-slim AS builder
+
+# Previne Python de gerar arquivos .pyc e mantém o stdout/stderr sem buffer
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1 \
-    TORCH_CUDA_ARCH_LIST="7.0 7.5 8.0 8.6 8.9 9.0+PTX" \
-    FORCE_CUDA="1"
+    DEBIAN_FRONTEND=noninteractive
 
-# Atualiza os pacotes do sistema e instala dependências essenciais
-RUN apt-get update && apt-get install -y \
-    ffmpeg \
-    libsndfile1 \
-    libportaudio2 \
-    libasound2-dev \
+# Instalar dependências de compilação
+RUN --mount=type=cache,target=/var/cache/apt \
+    apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
-    pkg-config \
-    git \
     curl \
+    gcc \
+    python3-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Define o diretório de trabalho
-WORKDIR /app
+# Criar e ativar ambiente virtual
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
 
-# Copia o arquivo de dependências para o container
+WORKDIR /build
+
+# Copiar e instalar dependências usando cache mount
 COPY requirements.txt .
-
-# Atualiza o pip e instala as dependências Python
-RUN pip install --upgrade pip && \
-    pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu118 && \
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --upgrade pip wheel && \
+    pip install torch==2.1.2+cpu torchaudio==2.1.2+cpu --index-url https://download.pytorch.org/whl/cpu && \
     pip install --no-cache-dir -r requirements.txt
 
-# Baixa os modelos do Fish Speech
-RUN mkdir -p models/fishespeech && \
-    curl -L https://huggingface.co/fishaudio/fish-speech/resolve/main/config.json -o models/fishespeech/config.json && \
-    curl -L https://huggingface.co/fishaudio/fish-speech/resolve/main/pytorch_model.bin -o models/fishespeech/pytorch_model.bin
+# Baixar modelos usando cache mount
+RUN --mount=type=cache,target=/root/.cache/huggingface \
+    pip install --no-cache-dir huggingface_hub && \
+    huggingface-cli download --resume-download fishaudio/fish-speech-1.5 --local-dir models/fish-speech-1.5
 
-# Copia todo o código da aplicação
-COPY . .
+# Imagem final otimizada
+FROM python:3.10-slim AS final
 
-# Expõe as portas do serviço e métricas
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PATH="/opt/venv/bin:$PATH"
+
+# Criar usuário não-root com UID específico para melhor segurança
+ARG UID=10001
+RUN adduser \
+    --disabled-password \
+    --gecos "" \
+    --home "/nonexistent" \
+    --shell "/sbin/nologin" \
+    --no-create-home \
+    --uid "${UID}" \
+    appuser
+
+# Instalar apenas runtime dependencies
+RUN --mount=type=cache,target=/var/cache/apt \
+    apt-get update && apt-get install -y --no-install-recommends \
+    libsox-dev \
+    ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copiar ambiente virtual e modelos do builder
+COPY --from=builder /opt/venv /opt/venv
+COPY --from=builder /build/models /app/models
+
+WORKDIR /app
+
+# Copiar código da aplicação e ajustar permissões
+COPY --chown=appuser:appuser . .
+
+USER appuser
+
 EXPOSE 8000 8001
 
-# Define o comando para iniciar o serviço
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
 CMD ["gunicorn", "app:app", "--worker-class", "uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:8000", "--workers", "4", "--timeout", "300"]

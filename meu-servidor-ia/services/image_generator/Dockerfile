@@ -1,22 +1,29 @@
 FROM python:3.10-slim
 
-# Atualiza os pacotes do sistema e instala dependências essenciais
+# Instala dependências do sistema
 RUN apt-get update && apt-get install -y \
     libglib2.0-0 \
     git \
- && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/*
 
 # Define o diretório de trabalho
 WORKDIR /app
 
-# Copia o arquivo de dependências para o container
-COPY requirements.txt .
+# Copia os arquivos de requisitos
+COPY requirements-base.txt requirements.txt ./
 
-# Atualiza o pip e instala as dependências listadas
-RUN pip install --upgrade pip && pip install --no-cache-dir -r requirements.txt
+# Instala primeiro as dependências base (PyTorch e fundamentais)
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir -r requirements-base.txt
 
-# Copia todo o código da aplicação para o diretório de trabalho
+# Instala o restante das dependências e adiciona gunicorn
+RUN pip install --no-cache-dir -r requirements.txt gunicorn
+
+# Copia o código da aplicação
 COPY . .
 
-# Inicia o serviço com Gunicorn utilizando 4 workers (UvicornWorker para suporte assíncrono)
-CMD ["gunicorn", "app:app", "--worker-class", "uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:8000", "--workers", "4"]
+# Expõe a porta que o serviço usará
+EXPOSE 8000
+
+# Comando para iniciar o serviço com Gunicorn e workers Uvicorn
+CMD ["gunicorn", "app:app", "--workers", "4", "--worker-class", "uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:8000", "--timeout", "300", "--keep-alive", "5", "--log-level", "info"]

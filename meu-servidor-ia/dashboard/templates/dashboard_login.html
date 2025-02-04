@@ -36,6 +36,7 @@
             margin-bottom: 5px;
             text-align: left;
         }
+        input[type="text"],
         input[type="password"] {
             padding: 10px;
             border-radius: 6px;
@@ -72,6 +73,8 @@
             <p class="error">{{ error }}</p>
         {% endif %}
         <form method="post" action="/login">
+            <label for="username">Usuário:</label>
+            <input type="text" name="username" id="username" required>
             <label for="password">Senha:</label>
             <input type="password" name="password" id="password" required>
             <button type="submit">Entrar</button>
