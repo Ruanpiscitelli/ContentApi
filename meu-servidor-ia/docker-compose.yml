@@ -43,6 +43,31 @@ services:
   ###########################################################
   # Serviços de Geração de Conteúdo
   ###########################################################
+  vllm:
+    image: vllm/vllm-openai:latest
+    platform: linux/amd64
+    container_name: vllm_service
+    command: >
+      --model mistralai/Mistral-7B-v0.1
+      --host 0.0.0.0
+      --port 8000
+      --tensor-parallel-size 1
+      --gpu-memory-utilization 0.90
+      --max-num-batched-tokens 8192
+    ports:
+      - "8007:8000"
+    volumes:
+      - ./cache:/data
+    # Configurações de GPU - comentadas para Mac
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - capabilities: [gpu]
+    #           count: 1
+    #           driver: nvidia
+    # runtime: nvidia
+
   image_generator:
     build:
       context: ./services/image_generator
@@ -125,6 +150,47 @@ services:
     #           driver: nvidia
     # runtime: nvidia
 
+  text_generation:
+    build:
+      context: ./services/text_generation
+      dockerfile: Dockerfile
+    platform: linux/amd64
+    container_name: text_generation_service
+    ports:
+      - "8006:8000"
+    environment:
+      - API_TOKEN=${API_TOKEN}
+      - VLLM_ENDPOINT=http://vllm:8000/v1/completions
+      - TEXT_GEN_API_TOKEN=${TEXT_GEN_API_TOKEN}
+      - REDIS_URL=redis://redis:6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+    volumes:
+      - ./cache:/app/cache
+    depends_on:
+      - vllm
+      - redis
+    # Configurações de GPU - comentadas para Mac
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - capabilities: [gpu]
+    #           count: 1
+    #           driver: nvidia
+    # runtime: nvidia
+
+  ###########################################################
+  # Cache Redis
+  ###########################################################
+  redis:
+    image: redis:7.2-alpine
+    container_name: redis_service
+    ports:
+      - "6379:6379"
+    command: redis-server --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - redis_data:/data
+
   ###########################################################
   # Proxy reverso (Nginx)
   ###########################################################
@@ -141,7 +207,9 @@ services:
       - voice_generator
       - video_generator
       - video_editor
+      - text_generation
 
 volumes:
   grafana_data:
   prometheus_data: {}
+  redis_data: {}

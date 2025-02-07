@@ -207,6 +207,13 @@
             background-color: rgba(255, 68, 68, 0.1);
             border: 1px solid #ff4444;
         }
+        .text-metrics {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            padding: 10px;
+        }
+        .text-metrics .metric-item {
     </style>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="/static/js/charts.js"></script>
@@ -236,6 +243,27 @@
             <div class="metric-card">
                 <h3>Memória</h3>
                 <div id="memory-usage" class="metric-value">{{ metrics.memory }}</div>
+            </div>
+            <div class="metric-card">
+                <h3>Text Generator</h3>
+                <div class="text-metrics">
+                    <div class="metric-item">
+                        <span class="label">Latência:</span>
+                        <span id="text-latency" class="value">0ms</span>
+                    </div>
+                    <div class="metric-item">
+                        <span class="label">Taxa de Erros:</span>
+                        <span id="text-error-rate" class="value">0%</span>
+                    </div>
+                    <div class="metric-item">
+                        <span class="label">Cache Hit Rate:</span>
+                        <span id="text-cache-rate" class="value">0%</span>
+                    </div>
+                    <div class="metric-item">
+                        <span class="label">Tokens/min:</span>
+                        <span id="text-tokens" class="value">0</span>
+                    </div>
+                </div>
             </div>
             {% for gpu_id, gpu_data in metrics.gpu.items() %}
             {% if gpu_data is mapping %}
@@ -416,7 +444,7 @@
         eventSource.addEventListener('metrics', function(event) {
             try {
                 const data = JSON.parse(event.data);
-                updateGPUMetrics(data);
+                updateGPUMetrics(data.gpu);
             } catch (error) {
                 console.error('Erro ao processar métricas:', error);
             }
@@ -450,6 +478,23 @@
                 metricsChart.destroy();
             }
         });
+
+        function updateMetrics(data) {
+            // Atualiza métricas existentes
+            document.getElementById('cpu-usage').textContent = `${data.cpu}%`;
+            document.getElementById('memory-usage').textContent = `${data.memory} GB`;
+
+            // Atualiza métricas do text generator
+            if (data.text_generator) {
+                document.getElementById('text-latency').textContent = `${data.text_generator.latency.toFixed(2)}ms`;
+                document.getElementById('text-error-rate').textContent = `${data.text_generator.error_rate.toFixed(2)}%`;
+                document.getElementById('text-cache-rate').textContent = `${data.text_generator.cache_hit_rate.toFixed(2)}%`;
+                document.getElementById('text-tokens').textContent = data.text_generator.tokens_per_minute;
+            }
+
+            // Atualiza métricas GPU
+            updateGPUMetrics(data.gpu);
+        }
     </script>
 </body>
 </html>

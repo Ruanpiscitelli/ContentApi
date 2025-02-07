@@ -3,53 +3,52 @@ kind: Ingress
 metadata:
   name: content-api-ingress
   annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /$1
-    # Caso utilize Cert-Manager para SSL, adicione as anotações necessárias, por exemplo:
-    # cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
 spec:
   rules:
-  - host: contentapi.ruanpiscitelli.com
+  - host: api.ruanpiscitelli.com
     http:
       paths:
-      - path: /dashboard/(.*)
+      - path: /dashboard
         pathType: Prefix
         backend:
           service:
             name: dashboard-service
             port:
               number: 8000
-      - path: /generate-image/(.*)
+      - path: /image
         pathType: Prefix
         backend:
           service:
             name: image-generator-service
             port:
               number: 8000
-      - path: /generate-voice/(.*)
+      - path: /voice
         pathType: Prefix
         backend:
           service:
             name: voice-generator-service
             port:
               number: 8000
-      - path: /clone-voice/(.*)
-        pathType: Prefix
-        backend:
-          service:
-            name: voice-generator-service
-            port:
-              number: 8000
-      - path: /generate-video/(.*)
+      - path: /video
         pathType: Prefix
         backend:
           service:
             name: video-generator-service
             port:
               number: 8000
-      - path: /edit-video/(.*)
+      - path: /video-edit
         pathType: Prefix
         backend:
           service:
             name: video-editor-service
             port:
               number: 8000
+      - path: /text
+        pathType: Prefix
+        backend:
+          service:
+            name: text-generator-service
+            port:
+              number: 8000 

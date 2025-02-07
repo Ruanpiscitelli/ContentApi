@@ -54,6 +54,7 @@ API_KEY_FILE = "api_keys.txt"
 
 # URLs dos serviços
 SERVICES = {
+    "text_generator": "http://localhost:8006",
     "image_generator": "http://localhost:8001",
     "voice_generator": "http://localhost:8002",
     "video_generator": "http://localhost:8003",
@@ -301,11 +302,29 @@ async def api_metrics(user: str = Depends(require_login)):
         cpu_percent = psutil.cpu_percent()
         memory = psutil.virtual_memory()
         
+        # Coleta métricas do text generator
+        text_metrics = {
+            "latency": 0,
+            "error_rate": 0,
+            "cache_hit_rate": 0,
+            "tokens_per_minute": 0
+        }
+        
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(f"{SERVICES['text_generator']}/metrics") as response:
+                    if response.status == 200:
+                        text_data = await response.json()
+                        text_metrics.update(text_data)
+        except Exception as e:
+            logger.error(f"Erro ao coletar métricas do text generator: {e}")
+        
         return {
             "timestamp": datetime.now().isoformat(),
             "cpu": cpu_percent,
             "memory": round(memory.used / (1024**3), 2),  # GB
-            "gpu": metrics
+            "gpu": metrics,
+            "text_generator": text_metrics
         }
     except Exception as e:
         await dashboard_state.add_log(f"Erro ao coletar métricas: {str(e)}", level="ERROR")

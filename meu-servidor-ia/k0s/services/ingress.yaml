@@ -1,0 +1,67 @@
+# k0s - Configuração do Ingress
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: content-api-ingress
+  namespace: content-api
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "100m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+spec:
+  rules:
+  - host: api.ruanpiscitelli.com
+    http:
+      paths:
+      - path: /dashboard
+        pathType: Prefix
+        backend:
+          service:
+            name: dashboard-service
+            port:
+              number: 8000
+      - path: /image
+        pathType: Prefix
+        backend:
+          service:
+            name: image-generator-service
+            port:
+              number: 8000
+      - path: /voice
+        pathType: Prefix
+        backend:
+          service:
+            name: voice-generator-service
+            port:
+              number: 8000
+      - path: /video
+        pathType: Prefix
+        backend:
+          service:
+            name: video-generator-service
+            port:
+              number: 8000
+      - path: /video-edit
+        pathType: Prefix
+        backend:
+          service:
+            name: video-editor-service
+            port:
+              number: 8000
+      - path: /text
+        pathType: Prefix
+        backend:
+          service:
+            name: text-generator-service
+            port:
+              number: 8000
+      - path: /metrics
+        pathType: Prefix
+        backend:
+          service:
+            name: prometheus-service
+            port:
+              number: 9090 
