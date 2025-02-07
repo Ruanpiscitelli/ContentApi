@@ -1,38 +1,122 @@
+import os
+import uuid
+import time
+import torch
+import logging
 import asyncio
 import base64
-import json
-import os
-from io import BytesIO
-import time
-import uuid
-import numpy as np
+import io
 from PIL import Image
-from datetime import datetime, timedelta
-
-from fastapi import FastAPI, HTTPException, Header, Depends, UploadFile, File, Form, BackgroundTasks
-from pydantic import BaseModel, Field, ConfigDict
-from typing import Optional, List, Dict, Union, Literal, Annotated
+from fastapi import FastAPI, HTTPException, Depends, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.timeout import TimeoutMiddleware
+from pydantic import BaseModel, Field
+from typing import Optional, List, Dict, Any
+from contextlib import asynccontextmanager
 
 from diffusers import (
     StableDiffusionPipeline,
-    AutoencoderKL,
+    StableDiffusionXLPipeline,
     ControlNetModel,
-    StableDiffusionControlNetPipeline,
-    DDIMScheduler,
+    AutoencoderKL,
+    EulerAncestralDiscreteScheduler,
     DPMSolverMultistepScheduler,
     EulerDiscreteScheduler,
-    EulerAncestralDiscreteScheduler,
+    DDIMScheduler,
     UniPCMultistepScheduler
 )
-import torch
-import cv2
 
-# Importa o cliente do MinIO e os erros
-from minio import Minio
-from minio.error import S3Error
+from .monitoring import (
+    IMAGE_GENERATION_LATENCY,
+    BATCH_SIZE,
+    MetricsContext,
+    track_time,
+    track_errors,
+    update_resource_metrics,
+    get_metrics_snapshot
+)
 
-# Importa os samplers
-from samplers import get_sampler, SAMPLER_REGISTRY
+from .validations import (
+    ValidationError,
+    ResourceError,
+    ProcessingError,
+    validate_model_compatibility,
+    validate_memory_requirements,
+    validate_scheduler_config,
+    validate_lora_weights,
+    validate_vae_config,
+    load_and_validate_template
+)
+
+from .config import DEVICE
+from .auth import verify_bearer_token
+from .storage import upload_to_minio, check_minio_connection
+from .utils import convert_image_to_bytes
+
+# Configurações de GPU e Otimizações
+DEVICE_CONFIG = {
+    "min_gpu_memory": 8,  # GB - Mínimo recomendado
+    "recommended_gpu_memory": 16,  # GB
+    "fp16_enabled": True,  # Usar FP16 quando disponível
+    "fp8_enabled": False,  # Suporte a FP8 (experimental)
+    "flash_attention": True,  # Recomendado pelo Hunyuan
+    "xformers_memory_efficient": True,
+    "cuda_graphs_enabled": True,
+    "torch_compile": True,
+    "parallel_degree": 1  # Grau de paralelismo
+}
+
+# Otimizações de memória baseadas no Hunyuan
+MEMORY_CONFIG = {
+    "cpu_offload": True,  # Recomendado para economizar VRAM
+    "attention_slicing": True,
+    "vae_slicing": True,
+    "model_cpu_offload": True,
+    "sequential_cpu_offload": True,
+    "enable_vae_tiling": True,
+    "gradient_checkpointing": False
+}
+
+# Configuração de logging
+logger = logging.getLogger(__name__)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Gerencia o ciclo de vida da aplicação."""
+    try:
+        # Inicialização
+        optimize_torch_settings()
+        await initialize_models()
+        logger.info("Serviço inicializado com sucesso")
+        yield
+    finally:
+        # Limpeza
+        await cleanup_resources()
+        logger.info("Recursos liberados com sucesso")
+
+# Inicializa a aplicação FastAPI
+app = FastAPI(
+    title="Serviço de Geração de Imagens",
+    description="API para geração de imagens usando modelos Stable Diffusion",
+    version="2.0.0",
+    lifespan=lifespan
+)
+
+# Configuração de CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=os.getenv("ALLOWED_ORIGINS", "http://localhost").split(","),
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    max_age=3600
+)
+
+# Adiciona middleware de timeout
+app.add_middleware(
+    TimeoutMiddleware,
+    timeout=300  # 5 minutos
+)
 
 ######################################
 # Configurações de Otimização
@@ -49,8 +133,7 @@ USE_TORCH_XLA = False  # Para TPUs (se disponível)
 
 # Configurações de processamento
 MAX_QUEUE_SIZE = 200     # Máximo de requisições na fila
-MAX_CONCURRENT_TASKS = 64  # Número máximo de tarefas processadas simultaneamente
-BATCH_SIZE = 32          # Tamanho do batch para processamento em lote
+MAX_CONCURRENT_TASKS = 128  # Número máximo de tarefas processadas simultaneamente
 
 # Configurações de timeout e retry
 MAX_RETRIES = 2         # Número de tentativas
@@ -67,8 +150,6 @@ if DEVICE == "cuda":
 # Configurações de cache
 os.environ["TRANSFORMERS_CACHE"] = "models/cache"
 os.environ["HF_HOME"] = "models/hub"
-
-app = FastAPI()
 
 ######################################
 # 1. Validação de Token
@@ -136,92 +217,71 @@ def verify_bearer_token(authorization: str = Header(None)):
 ######################################
 class ControlNetConfig(BaseModel):
     """Configuração para ControlNet"""
-    model_config = ConfigDict(
-        str_strip_whitespace=True,
-        validate_default=True,
-        extra='forbid'
-    )
+    model_id: str
+    image: str  # Base64 da imagem de condicionamento
+    scale: float = Field(default=1.0, ge=0.0, le=1.0)
     
-    model_id: str = Field(description="ID do modelo ControlNet (ex: lllyasviel/control_v11p_sd15_canny)")
-    image_url: Optional[str] = Field(
-        default=None,
-        description="URL da imagem de condicionamento"
-    )
-    image_base64: Optional[str] = Field(
-        default=None,
-        description="Imagem de condicionamento em base64"
-    )
-    conditioning_scale: Annotated[float, Field(ge=0.0, le=2.0)] = Field(
-        default=1.0,
-        description="Peso do condicionamento"
-    )
-    preprocessor: Literal["canny", "depth", "mlsd", "normal", "openpose", "scribble"] = Field(
-        default="canny",
-        description="Tipo de pré-processamento"
-    )
-    preprocessor_params: Dict = Field(
-        default_factory=dict,
-        description="Parâmetros para o pré-processador"
-    )
+class LoRAConfig(BaseModel):
+    """Configuração para LoRA"""
+    model_id: str
+    scale: float = Field(default=1.0, ge=0.0, le=2.0)
+    
+class VAEConfig(BaseModel):
+    """Configuração para VAE"""
+    model_id: str
+    tiling: bool = False
 
 class ImageRequest(BaseModel):
-    """Modelo de requisição para geração de imagem"""
-    model_config = ConfigDict(
-        str_strip_whitespace=True,
-        validate_default=True,
-        extra='forbid'
-    )
+    """
+    Modelo para requisição de geração de imagem.
+    Suporta configurações avançadas como ControlNet, LoRA e VAE.
+    """
+    prompt: str = Field(..., min_length=1, max_length=1000)
+    negative_prompt: Optional[str] = Field(default="", max_length=1000)
+    height: int = Field(default=512, ge=256, le=1024, multiple_of=8)
+    width: int = Field(default=512, ge=256, le=1024, multiple_of=8)
+    num_inference_steps: int = Field(default=30, ge=1, le=150)
+    guidance_scale: float = Field(default=7.5, ge=1.0, le=20.0)
+    seed: Optional[int] = None
+    model: str = Field(default="stabilityai/stable-diffusion-xl-base-1.0")
+    scheduler: str = Field(default="euler_a")
     
-    prompt: str
-    negative_prompt: Optional[str] = None
-    model: str = Field(default="sdxl")
-    height: Annotated[int, Field(ge=256, le=2048)] = 512
-    width: Annotated[int, Field(ge=256, le=2048)] = 512
-    num_inference_steps: Annotated[int, Field(ge=1, le=150)] = 50
-    template_id: Optional[str] = None
-    loras: List[Dict] = Field(default_factory=list)
+    # Configurações avançadas
     controlnet: Optional[ControlNetConfig] = None
-    vae: Optional[str] = Field(
-        default=None,
-        description="ID ou path do VAE personalizado"
-    )
-    scheduler: str = Field(
-        default="DPMSolverMultistepScheduler",
-        description="Scheduler para geração"
-    )
-    guidance_scale: Annotated[float, Field(ge=1.0, le=20.0)] = Field(
-        default=7.5,
-        description="Escala de guidance do CFG"
-    )
-    seed: Optional[int] = Field(
-        default=None,
-        description="Seed para reprodutibilidade"
-    )
-    clip_skip: Optional[Annotated[int, Field(ge=1, le=4)]] = Field(
-        default=None,
-        description="Número de camadas CLIP a pular"
-    )
-    optimization: Dict = Field(
-        default_factory=lambda: {
-            "tomesd": {
-                "enabled": True,
-                "ratio": 0.4,
-                "max_downsample": 2
-            },
-            "enable_vae_tiling": True,
-            "enable_vae_slicing": True,
-            "enable_attention_slicing": True,
-            "enable_sequential_cpu_offload": False,
-            "enable_model_cpu_offload": False,
-            "torch_compile": True,
-            "torch_compile_mode": "reduce-overhead"
-        },
-        description="Configurações de otimização de memória e performance"
-    )
-
-    def validate_dimensions(self):
-        """Validações adicionais foram movidas para validators do modelo"""
-        pass
+    loras: Optional[List[LoRAConfig]] = None
+    vae: Optional[VAEConfig] = None
+    template_id: Optional[str] = None
+    
+    class Config:
+        schema_extra = {
+            "example": {
+                "prompt": "Uma paisagem montanhosa ao pôr do sol",
+                "negative_prompt": "blur, desfoque, baixa qualidade",
+                "height": 512,
+                "width": 768,
+                "num_inference_steps": 30,
+                "guidance_scale": 7.5,
+                "seed": 42,
+                "model": "stabilityai/stable-diffusion-xl-base-1.0",
+                "scheduler": "euler_a",
+                "controlnet": {
+                    "model_id": "lllyasviel/sd-controlnet-canny",
+                    "image": "base64_da_imagem",
+                    "scale": 0.8
+                },
+                "loras": [
+                    {
+                        "model_id": "seu_lora",
+                        "scale": 0.7
+                    }
+                ],
+                "vae": {
+                    "model_id": "stabilityai/sd-vae-ft-mse",
+                    "tiling": true
+                },
+                "template_id": "landscape_template"
+            }
+        }
 
 def load_template(template_id: str) -> dict:
     """
@@ -407,82 +467,39 @@ def apply_clip_skip(pipeline, clip_skip: int):
         print(f"CLIP skip {clip_skip} aplicado")
     return pipeline
 
-def load_pipeline(model_name: str, checkpoint_path: Optional[str] = None, controlnet_config: Optional[ControlNetConfig] = None, vae_id: Optional[str] = None):
-    """
-    Carrega o pipeline do modelo com otimizações de memória e performance.
-    Suporta ControlNet e VAE personalizado.
-    """
-    global pipe
-    try:
-        if model_name.lower() == "flux":
-            model_dir = checkpoint_path or "models/flux"
-        else:
-            model_dir = checkpoint_path or "models/sdxl"
+def _load_pipeline_sync(model_id: str) -> StableDiffusionPipeline:
+    """Função síncrona para carregar o pipeline do modelo"""
+    logger.info(f"Carregando modelo {model_id}")
+    
+    if "xl" in model_id.lower():
+        pipeline = StableDiffusionXLPipeline.from_pretrained(
+            model_id,
+            torch_dtype=torch.float16,
+            use_safetensors=True,
+            variant="fp16"
+        )
+    else:
+        pipeline = StableDiffusionPipeline.from_pretrained(
+            model_id,
+            torch_dtype=torch.float16,
+            use_safetensors=True,
+            variant="fp16"
+        )
+        
+    pipeline.to(DEVICE)
+    return pipeline
 
-        # Carrega ControlNet se especificado
-        if controlnet_config:
-            controlnet = ControlNetModel.from_pretrained(
-                controlnet_config.model_id,
-                torch_dtype=TORCH_DTYPE
-            )
-            pipe = StableDiffusionControlNetPipeline.from_pretrained(
-                model_dir,
-                controlnet=controlnet,
-                torch_dtype=TORCH_DTYPE,
-                variant="fp16" if DEVICE == "cuda" else None,
-                use_safetensors=True
-            )
-        else:
-            pipe = StableDiffusionPipeline.from_pretrained(
-                model_dir,
-                torch_dtype=TORCH_DTYPE,
-                variant="fp16" if DEVICE == "cuda" else None,
-                use_safetensors=True
-            )
-
-        # Carrega VAE personalizado se especificado
-        if vae_id:
-            pipe.vae = AutoencoderKL.from_pretrained(
-                vae_id,
-                torch_dtype=TORCH_DTYPE
-            )
-        
-        # Aplica otimizações de memória
-        pipe = apply_memory_optimizations(pipe)
-        
-        # Move para GPU
-        pipe = pipe.to(DEVICE)
-        
-        # Compila o modelo para melhor performance
-        if USE_TORCH_COMPILE and DEVICE == "cuda":
-            pipe.unet = torch.compile(
-                pipe.unet,
-                mode="reduce-overhead",
-                fullgraph=True
-            )
-            pipe.vae = torch.compile(
-                pipe.vae,
-                mode="reduce-overhead",
-                fullgraph=True
-            )
-        
-        # Multi-GPU se disponível
-        if torch.cuda.device_count() > 1:
-            pipe.unet = torch.nn.DataParallel(pipe.unet)
-            pipe.vae = torch.nn.DataParallel(pipe.vae)
-
-        # Configura o sampler personalizado
-        if hasattr(pipe, 'scheduler'):
-            scheduler_name = pipe.scheduler.__class__.__name__
-            if scheduler_name in AVAILABLE_SCHEDULERS:
-                sampler_name = AVAILABLE_SCHEDULERS[scheduler_name]
-                pipe._sampler = get_sampler(sampler_name)
-            else:
-                pipe._sampler = get_sampler('ddim')  # Sampler padrão
-        
-        return pipe
-    except Exception as e:
-        raise RuntimeError(f"Erro ao carregar o pipeline: {str(e)}")
+async def load_pipeline(model_id: str) -> StableDiffusionPipeline:
+    """Carrega um pipeline do cache ou baixa se necessário de forma assíncrona"""
+    if model_id not in MODEL_CACHE:
+        # Executa o carregamento pesado em uma thread separada
+        pipeline = await asyncio.get_event_loop().run_in_executor(
+            None,
+            lambda: _load_pipeline_sync(model_id)
+        )
+        MODEL_CACHE[model_id] = pipeline
+    
+    return MODEL_CACHE[model_id]
 
 ######################################
 # 4. Integração com MinIO
@@ -603,47 +620,116 @@ def apply_loras(pipeline, loras: list):
 # 6. Endpoint de Geração de Imagem (Assíncrono)
 ######################################
 @app.post("/generate-image")
-async def generate_image_endpoint(
+@track_inference(model="stable-diffusion")
+async def generate_image(
     request: ImageRequest,
     token: str = Depends(verify_bearer_token)
 ):
-    """Endpoint para geração de imagem com fila"""
-    # Valida as dimensões
-    request.validate_dimensions()
-    
-    # Gera ID único para a tarefa
-    task_id = str(uuid.uuid4())
-    
-    # Adiciona à fila
-    status = await queue_manager.add_task(task_id, request)
-    
-    return {
-        "task_id": task_id,
-        "status": status.status,
-        "message": "Tarefa adicionada à fila com sucesso"
-    }
+    """
+    Endpoint para geração de imagens com otimizações Hunyuan.
+    """
+    try:
+        # Valida requisitos do sistema
+        validate_system_requirements()
+        
+        # Valida requisitos do modelo
+        validate_model_requirements(request.model)
+        
+        # Carrega template se fornecido
+        if request.template_id:
+            template = load_template(request.template_id)
+            request = ImageRequest(**{**template, **request.dict()})
+        
+        # Carrega e otimiza pipeline
+        pipeline = await load_pipeline(request.model)
+        pipeline = optimize_pipeline(pipeline)
+        
+        # Valida e ajusta batch size
+        batch_size = validate_batch_size(1, model_size_mb=2048)  # 2GB estimado
+        
+        # Gera imagem
+        with torch.cuda.amp.autocast():
+            image = await generate_image_with_pipeline(request, pipeline)
+            
+        # Converte para bytes
+        image_bytes = convert_image_to_bytes(image)
+        
+        # Upload para MinIO
+        file_name = f"image_{int(time.time())}_{uuid.uuid4()}.png"
+        url = await upload_to_minio(image_bytes, file_name)
+        
+        # Atualiza métricas finais
+        update_resource_metrics()
+        
+        return {
+            "status": "success",
+            "url": url,
+            "metadata": {
+                "model": request.model,
+                "resolution": f"{request.width}x{request.height}",
+                "steps": request.num_inference_steps,
+                "batch_size": batch_size
+            },
+            "metrics": get_metrics_snapshot()
+        }
+        
+    except ValidationError as e:
+        raise HTTPException(
+            status_code=400,
+            detail=str(e)
+        )
+    except ResourceError as e:
+        raise HTTPException(
+            status_code=503,
+            detail=str(e)
+        )
+    except Exception as e:
+        logger.error(f"Erro na geração: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erro interno: {str(e)}"
+        )
 
-@app.get("/task/{task_id}")
-async def get_task_status(
-    task_id: str,
-    token: str = Depends(verify_bearer_token)
-):
-    """Obtém o status de uma tarefa"""
-    return await queue_manager.get_task_status(task_id)
+@app.get("/metrics")
+async def get_metrics():
+    """Endpoint para métricas Prometheus."""
+    return get_metrics_snapshot()
 
-@app.delete("/task/{task_id}")
-async def cancel_task(
-    task_id: str,
-    token: str = Depends(verify_bearer_token)
-):
-    """Cancela uma tarefa pendente"""
-    await queue_manager.cancel_task(task_id)
-    return {"message": "Tarefa cancelada com sucesso"}
-
-@app.get("/queue/status")
-async def get_queue_status(token: str = Depends(verify_bearer_token)):
-    """Obtém status geral da fila"""
-    return await queue_manager.get_queue_info()
+@app.get("/health")
+async def health_check():
+    """Endpoint de verificação de saúde."""
+    try:
+        # Verifica GPU
+        gpu_ok = torch.cuda.is_available()
+        
+        # Verifica modelo
+        model_ok = True  # TODO: Implementar verificação de modelos
+        
+        # Verifica MinIO
+        minio_ok = check_minio_connection()
+        
+        status = "healthy" if all([gpu_ok, model_ok, minio_ok]) else "degraded"
+        
+        return {
+            "status": status,
+            "gpu": {
+                "available": gpu_ok,
+                "device": torch.cuda.get_device_name(0) if gpu_ok else None
+            },
+            "model": {
+                "loaded": model_ok
+            },
+            "minio": {
+                "connected": minio_ok
+            },
+            "metrics": get_metrics_snapshot()
+        }
+        
+    except Exception as e:
+        return {
+            "status": "unhealthy",
+            "error": str(e)
+        }
 
 ######################################
 # Configurações de Fila e Kubernetes
@@ -1137,7 +1223,7 @@ async def generate_image_with_pipeline(request: ImageRequest, pipe):
 
             if controlnet_image:
                 generation_args["image"] = controlnet_image
-                generation_args["controlnet_conditioning_scale"] = request.controlnet.conditioning_scale
+                generation_args["controlnet_conditioning_scale"] = request.controlnet.scale
 
             # Gera imagem com otimização de memória
             with torch.cuda.amp.autocast():
@@ -1170,6 +1256,66 @@ async def generate_image_with_pipeline(request: ImageRequest, pipe):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro na geração da imagem: {str(e)}")
 
+async def generate_image_with_params(
+    model_id: str,
+    params: Dict[str, Any],
+    controlnet_config: Optional[ControlNetConfig] = None,
+    lora_configs: Optional[List[LoRAConfig]] = None,
+    vae_config: Optional[VAEConfig] = None,
+    scheduler_name: str = "euler_a"
+) -> Image.Image:
+    """
+    Gera uma imagem com os parâmetros fornecidos.
+    Suporta ControlNet, LoRA e VAE customizado.
+    """
+    try:
+        # Carrega o pipeline base
+        pipeline = await load_pipeline(model_id)
+        
+        # Configura scheduler
+        pipeline.scheduler = get_scheduler(scheduler_name, pipeline.scheduler.config)
+        
+        # Configura VAE se fornecido
+        if vae_config:
+            vae = await load_vae(vae_config.model_id)
+            pipeline.vae = vae
+            if vae_config.tiling:
+                pipeline.enable_vae_tiling()
+        
+        # Configura ControlNet se fornecido
+        if controlnet_config:
+            controlnet = await load_controlnet(controlnet_config.model_id)
+            pipeline.controlnet = controlnet
+            
+            # Processa imagem de condicionamento
+            control_image = process_control_image(controlnet_config.image)
+            params["image"] = control_image
+            params["controlnet_conditioning_scale"] = controlnet_config.scale
+        
+        # Carrega e aplica LoRAs
+        if lora_configs:
+            for lora in lora_configs:
+                pipeline = await load_and_fuse_lora(
+                    pipeline,
+                    lora.model_id,
+                    lora.scale
+                )
+        
+        # Otimizações
+        pipeline.enable_model_cpu_offload()
+        pipeline.enable_attention_slicing()
+        
+        # Gera imagem
+        with torch.inference_mode():
+            output = pipeline(**params)
+            image = output.images[0]
+            
+        return image
+        
+    except Exception as e:
+        logger.error(f"Erro na geração: {str(e)}")
+        raise ProcessingError(f"Falha ao gerar imagem: {str(e)}")
+
 # Atualiza o startup_event para usar o novo gerenciador
 @app.on_event("startup")
 async def startup_event():
@@ -1194,4 +1340,151 @@ async def startup_event():
     os.makedirs("models/hub", exist_ok=True)
     
     # Carrega o pipeline padrão
-    await asyncio.get_event_loop().run_in_executor(None, lambda: load_pipeline("sdxl"))
+    await load_pipeline("sdxl")
+
+# Cache de modelos
+MODEL_CACHE = {}
+CONTROLNET_CACHE = {}
+VAE_CACHE = {}
+
+async def load_controlnet(model_id: str) -> ControlNetModel:
+    """Carrega um modelo ControlNet do cache ou baixa se necessário"""
+    if model_id not in CONTROLNET_CACHE:
+        logger.info(f"Carregando ControlNet {model_id}")
+        controlnet = ControlNetModel.from_pretrained(
+            model_id,
+            torch_dtype=torch.float16
+        )
+        controlnet.to(DEVICE)
+        CONTROLNET_CACHE[model_id] = controlnet
+        
+    return CONTROLNET_CACHE[model_id]
+
+async def load_vae(model_id: str) -> AutoencoderKL:
+    """Carrega um VAE do cache ou baixa se necessário"""
+    if model_id not in VAE_CACHE:
+        logger.info(f"Carregando VAE {model_id}")
+        vae = AutoencoderKL.from_pretrained(
+            model_id,
+            torch_dtype=torch.float16
+        )
+        vae.to(DEVICE)
+        VAE_CACHE[model_id] = vae
+        
+    return VAE_CACHE[model_id]
+
+async def load_and_fuse_lora(
+    pipeline: StableDiffusionPipeline,
+    model_id: str,
+    scale: float
+) -> StableDiffusionPipeline:
+    """Carrega e funde um modelo LoRA no pipeline"""
+    logger.info(f"Carregando e fundindo LoRA {model_id}")
+    pipeline.load_lora_weights(model_id)
+    pipeline.fuse_lora(scale)
+    return pipeline
+
+def get_scheduler(name: str, config: dict):
+    """Retorna o scheduler apropriado baseado no nome"""
+    schedulers = {
+        "euler_a": EulerAncestralDiscreteScheduler,
+        "dpm++": DPMSolverMultistepScheduler,
+        "euler": EulerDiscreteScheduler,
+        "ddim": DDIMScheduler,
+        "unipc": UniPCMultistepScheduler
+    }
+    
+    if name not in schedulers:
+        raise ValidationError(f"Scheduler {name} não suportado")
+        
+    return schedulers[name].from_config(config)
+
+def process_control_image(image_data: str) -> Image.Image:
+    """Processa a imagem de controle do ControlNet"""
+    try:
+        # Remove cabeçalho do base64 se presente
+        if "base64," in image_data:
+            image_data = image_data.split("base64,")[1]
+            
+        # Decodifica base64
+        image_bytes = base64.b64decode(image_data)
+        image = Image.open(io.BytesIO(image_bytes))
+        
+        # Converte para RGB se necessário
+        if image.mode != "RGB":
+            image = image.convert("RGB")
+            
+        return image
+        
+    except Exception as e:
+        raise ValidationError(f"Erro ao processar imagem de controle: {str(e)}")
+
+def optimize_pipeline(pipeline):
+    """
+    Aplica otimizações recomendadas pelo Hunyuan.
+    
+    Args:
+        pipeline: Pipeline de geração
+        
+    Returns:
+        Pipeline otimizado
+    """
+    if torch.cuda.is_available():
+        if DEVICE_CONFIG["fp16_enabled"]:
+            pipeline = pipeline.to(torch.float16)
+            
+        if DEVICE_CONFIG["flash_attention"]:
+            pipeline.enable_xformers_memory_efficient_attention()
+            
+        if MEMORY_CONFIG["cpu_offload"]:
+            pipeline.enable_model_cpu_offload()
+            
+        if MEMORY_CONFIG["vae_slicing"]:
+            pipeline.enable_vae_slicing()
+            
+        # Otimizações de atenção
+        if MEMORY_CONFIG["attention_slicing"]:
+            pipeline.enable_attention_slicing(1)
+        
+        # Otimizações de VAE
+        if MEMORY_CONFIG["enable_vae_tiling"]:
+            pipeline.enable_vae_tiling()
+        
+        # Otimizações de cache CUDA
+        torch.backends.cudnn.benchmark = True
+        
+        # Compilação do modelo se suportado
+        if DEVICE_CONFIG["torch_compile"] and hasattr(torch, 'compile'):
+            try:
+                pipeline.unet = torch.compile(
+                    pipeline.unet,
+                    mode="reduce-overhead",
+                    fullgraph=True
+                )
+                logger.info("Pipeline compilado com torch.compile()")
+            except Exception as e:
+                logger.warning(f"Erro ao compilar pipeline: {e}")
+        
+    return pipeline
+
+async def initialize_models():
+    """Inicializa modelos e recursos."""
+    if not torch.cuda.is_available():
+        raise RuntimeError("GPU com suporte CUDA é necessária")
+    
+    # Configura diretórios de cache
+    os.makedirs("models/cache", exist_ok=True)
+    os.makedirs("models/hub", exist_ok=True)
+    
+    # Carrega o pipeline padrão
+    await load_pipeline("sdxl")
+
+async def cleanup_resources():
+    """Libera recursos na finalização."""
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+    
+    # Limpa caches
+    MODEL_CACHE.clear()
+    CONTROLNET_CACHE.clear()
+    VAE_CACHE.clear()

@@ -8,22 +8,25 @@ services:
     ports:
       - "8005:8000"
     environment:
-      - DASHBOARD_PASSWORD=SenhaSuperSegura123!
-      - SESSION_SECRET=9c5b8d3e7f2a1d4e6b9c8a7f5d3e2b1a
-      - DASHBOARD_USERNAME=admin
+      - DASHBOARD_USERNAME=${DASHBOARD_USERNAME}
+      - DASHBOARD_PASSWORD=${DASHBOARD_PASSWORD}
+      - SESSION_SECRET=${SESSION_SECRET}
     depends_on:
       - prometheus
-    volumes:
-      - /usr/lib/nvidia:/usr/lib/nvidia:ro
 
   prometheus:
     image: prom/prometheus:v2.37.0
+    container_name: prometheus
     ports:
       - "9090:9090"
     volumes:
-      - ./dashboard/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./prometheus:/etc/prometheus
+      - prometheus_data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
 
   grafana:
     image: grafana/grafana:9.5.2
@@ -38,44 +41,51 @@ services:
       - prometheus
 
   ###########################################################
-  # Serviços de IA
+  # Serviços de Geração de Conteúdo
   ###########################################################
   image_generator:
-    build: ./services/image_generator
+    build:
+      context: ./services/image_generator
+      dockerfile: Dockerfile
+    platform: linux/amd64
     container_name: image_generator_service
     ports:
       - "8001:8000"
     environment:
-      - API_TOKEN=your_api_token_here
-      - NVIDIA_VISIBLE_DEVICES=all
-      - NVIDIA_DRIVER_CAPABILITIES=all
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
+      - API_TOKEN=${API_TOKEN}
+    volumes:
+      - ./cache:/app/cache
+    # Configurações de GPU - comentadas para Mac
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - capabilities: [gpu]
+    #           count: 1
+    #           driver: nvidia
+    # runtime: nvidia
 
   voice_generator:
-    build: ./services/voice_generator
-    container_name: voice_generator_service
+    build:
+      context: ./services/voice_generator
+      dockerfile: Dockerfile
     platform: linux/amd64
+    container_name: voice_generator_service
     ports:
       - "8002:8000"
-      - "8012:8001"
     environment:
-      - NVIDIA_VISIBLE_DEVICES=all
-      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
+      - API_TOKEN=${API_TOKEN}
     volumes:
-      - /usr/lib/nvidia:/usr/lib/nvidia:ro
+      - ./cache:/app/cache
+    # Configurações de GPU - comentadas para Mac
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - capabilities: [gpu]
+    #           count: 1
+    #           driver: nvidia
+    # runtime: nvidia
 
   video_generator:
     build: ./services/video_generator
@@ -83,16 +93,18 @@ services:
     ports:
       - "8003:8000"
     environment:
-      - API_TOKEN=your_api_token_here
-      - NVIDIA_VISIBLE_DEVICES=all
-      - NVIDIA_DRIVER_CAPABILITIES=all
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
+      - API_TOKEN=${API_TOKEN}
+    volumes:
+      - ./cache:/app/cache
+    # Configurações de GPU - comentadas para Mac
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - capabilities: [gpu]
+    #           count: 1
+    #           driver: nvidia
+    # runtime: nvidia
 
   video_editor:
     build: ./services/video_editor
@@ -100,16 +112,18 @@ services:
     ports:
       - "8004:8000"
     environment:
-      - API_TOKEN=your_api_token_here
-      - NVIDIA_VISIBLE_DEVICES=all
-      - NVIDIA_DRIVER_CAPABILITIES=all
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
+      - API_TOKEN=${API_TOKEN}
+    volumes:
+      - ./cache:/app/cache
+    # Configurações de GPU - comentadas para Mac
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - capabilities: [gpu]
+    #           count: 1
+    #           driver: nvidia
+    # runtime: nvidia
 
   ###########################################################
   # Proxy reverso (Nginx)
@@ -130,3 +144,4 @@ services:
 
 volumes:
   grafana_data:
+  prometheus_data: {}

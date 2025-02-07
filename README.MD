@@ -3,7 +3,7 @@
 Este projeto tem como objetivo construir um servidor cloud robusto que oferece diversas APIs para geração de conteúdo com inteligência artificial. Utilizando FastAPI, o sistema disponibiliza endpoints para:
 
 - **Geração de Imagens** (usando modelos como SDXL/Flux com injeção de LoRAs);
-- **Geração/Clonagem de Voz** (processamento de texto para áudio, com suporte à clonagem de voz via templates);
+- **Geração/Clonagem de Voz** (usando Fish Speech v2 para síntese e clonagem de voz);
 - **Geração de Vídeo com Hunyuan** (usando templates para definir parâmetros de geração);
 - **Edição de Vídeo via JSON** (inspirado no [json2video](https://json2video.com/docs/tutorial/));
 - **Dashboard Administrativo** para gerenciamento, upload de modelos, configuração de endpoints, visualização de logs e métricas.
@@ -41,7 +41,7 @@ O sistema foi pensado para ser altamente escalável – com execução assíncro
 - Suporte a múltiplos schedulers na geração de imagens (DDIM, DPMSolver++, Euler, etc.)
 - Sistema de cache em dois níveis (Redis + VRAM) para otimização de performance
 - Integração com ControlNet para geração de imagens condicionadas
-- Suporte a clonagem de voz com Fish Speech v2
+- Suporte a clonagem de voz com Fish Speech v2 (com otimizações CUDA e FP16)
 - Templates pré-configurados para geração de shorts e vídeos verticais
 
 ### Otimizações de Performance
@@ -49,25 +49,32 @@ O sistema foi pensado para ser altamente escalável – com execução assíncro
 - Suporte a VAE Tiling para processamento de imagens em alta resolução
 - Attention Slicing para otimização de uso de VRAM
 - Gerenciamento dinâmico de recursos GPU com failover automático
+- Otimização CUDA com FP16 para Fish Speech
+- Cache distribuído com Redis para modelos e áudios
+- Integração com MinIO/S3 para armazenamento
+- Monitoramento avançado com Prometheus
 
 ### Mudanças na Estrutura
 - Novo diretório `models/cache` para armazenamento local de modelos
 - Templates reorganizados por categoria (imagem/voz/vídeo)
 - Implementação de rate limiting baseado em GPU-hora
 - Sistema de monitoramento com Prometheus/Grafana
-
+- Multi-stage builds para otimização de containers
+- Healthchecks para todos os serviços
+- Configuração de usuários não-root para segurança
 
 ---
 
 ## Tecnologias Utilizadas
 
 - **Linguagem e Framework**: Python, FastAPI, Uvicorn, Gunicorn.
-- **Modelos e Bibliotecas de IA**: Diffusers, Torch, Transformers.
+- **Modelos e Bibliotecas de IA**: Diffusers, Torch, Transformers, Fish Speech, ONNX Runtime.
 - **Containerização**: Docker e Docker Compose.
 - **Orquestração**: Kubernetes (para produção).
 - **Proxy Reverso**: Nginx.
 - **Monitoramento (Opcional)**: Prometheus e Grafana.
 - **Templates de Configuração**: JSON (armazenados no diretório `templates/`).
+- **Cache e Storage**:  MinIO/S3
 
 ---
 
@@ -109,7 +116,10 @@ meu-servidor-ia/
 │   ├── voice_generator/           # API para geração/clonagem de voz (Fishspeech e voice cloning)
 │   │   ├── app.py
 │   │   ├── Dockerfile
-│   │   └── requirements.txt
+│   │   ├── requirements.txt
+│   │   ├── fish_speech_wrapper.py # Wrapper otimizado para Fish Speech
+│   │   ├── config.py             # Configurações e otimizações
+│   │   └── shared/               # Utilitários compartilhados
 │   ├── video_generator/           # API para geração de vídeo utilizando Hunyuan
 │   │   ├── app.py
 │   │   ├── Dockerfile
@@ -318,9 +328,24 @@ Para dúvidas ou sugestões, entre em contato através do seu-email@dominio.com.
 
 ## Variáveis de Ambiente Adicionais
 ```yaml
+# Token de Autenticação API
+API_TOKEN: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."  # Token JWT para autenticação
+
+# Configurações CUDA/GPU
 TORCH_COMPILE_MODE: "reduce-overhead"  # Otimização JIT
 ENABLE_VAE_TILING: "true"             # Para imagens em alta resolução
 GPU_RATE_LIMIT: "100"                 # Requisições por GPU-hora
 ```
+
+## Segurança
+
+O sistema utiliza autenticação via token JWT. Para gerar um novo token:
+
+```bash
+# Usando Python para gerar um token
+python -c "import jwt; print(jwt.encode({'service': 'ai-content-api', 'iat': 1710954800}, 'seu-segredo-aqui', algorithm='HS256'))"
+```
+
+O token deve ser configurado no arquivo `.env` e usado em todas as requisições no header `Authorization: Bearer <token>`.
 
 This README.md provides a complete description of the project, technology, structure, installation, usage, and further details.

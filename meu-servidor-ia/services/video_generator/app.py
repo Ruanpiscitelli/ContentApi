@@ -7,6 +7,7 @@ import uuid
 import logging
 from io import BytesIO
 from pathlib import Path
+import concurrent.futures
 
 import torch
 import torchvision
@@ -182,37 +183,40 @@ class VideoRequest(BaseModel):
         default=True,
         description="Usar quantização NF4/INT8 para menor uso de VRAM"
     )
+    motion_bucket_id: Optional[int] = Field(
+        default=127,
+        ge=1,
+        le=255,
+        description="Controle de movimento (1-255)"
+    )
+    noise_aug_strength: Optional[float] = Field(
+        default=0.02,
+        ge=0.0,
+        le=1.0,
+        description="Força do ruído de augmentação"
+    )
     template_id: Optional[str] = None
 
     def validate_dimensions(self):
         """Valida as dimensões do vídeo"""
-        # Verifica se é múltiplo
-        if self.width % 64 != 0 or self.height % 64 != 0:
-            raise HTTPException(
-                status_code=400,
-                detail="Dimensões devem ser múltiplos de 64"
-            )
+        from utils.validation import validate_dimensions, validate_duration
         
-        # Verifica se é uma resolução suportada
-        resolution_found = False
-        for aspect_ratio, resolutions in SUPPORTED_RESOLUTIONS.items():
-            for h, w in resolutions:
-                if int(h) == self.height and int(w) == self.width:
-                    resolution_found = True
-                    break
+        validate_dimensions(self.width, self.height)
+        validate_duration(self.duration)
         
-        if not resolution_found:
-            raise HTTPException(
-                status_code=400,
-                detail="Resolução não suportada. Consulte a documentação para resoluções válidas."
-            )
-        
-        # Verifica duração
-        if self.duration % 8 != 0:
-            raise HTTPException(
-                status_code=400,
-                detail="Duração deve ser múltiplo de 8 frames"
-            )
+    class Config:
+        schema_extra = {
+            "example": {
+                "prompt": "Uma cidade futurista durante o pôr do sol, estilo cyberpunk",
+                "negative_prompt": "baixa qualidade, borrado, pixelado",
+                "duration": 16,
+                "height": 576,
+                "width": 1024,
+                "fps": 8,
+                "motion_bucket_id": 127,
+                "noise_aug_strength": 0.02
+            }
+        }
 
 def load_template(template_id: str) -> dict:
     """
@@ -343,106 +347,276 @@ def upload_video_to_minio(file_bytes: bytes, file_name: str) -> str:
 ######################################
 # 5. Endpoint de Geração de Vídeo (FastHunyuan) - Assíncrono
 ######################################
-@app.post("/generate-video")
-async def generate_video(request: VideoRequest, token: str = Depends(verify_bearer_token)):
-    """
-    Gera vídeo utilizando o modelo FastHunyuan otimizado.
-    """
-    # Valida as dimensões
-    request.validate_dimensions()
+# Executor para operações bloqueantes
+thread_pool = concurrent.futures.ThreadPoolExecutor()
 
-    if request.template_id:
-        try:
-            template = load_template(request.template_id)
-            for key, value in template.items():
-                if hasattr(request, key):
-                    setattr(request, key, value)
-            request.validate_dimensions()
-        except Exception as e:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Erro ao carregar template: {str(e)}"
-            )
+def _generate_video_sync(
+    generation_params: dict,
+    generator: Optional[torch.Generator] = None
+) -> torch.Tensor:
+    """
+    Função síncrona auxiliar para gerar vídeo usando o modelo.
+    Esta função é executada em uma thread separada para não bloquear o loop de eventos.
     
-    global video_generator
-    if video_generator is None:
-        await asyncio.get_event_loop().run_in_executor(None, load_video_generator)
-    
-    try:
-        # Define a seed se não fornecida
-        if request.seed is None:
-            request.seed = int(time.time())
-            
-        # Configura o gerador para reprodutibilidade
-        generator = torch.Generator(device=DEVICE).manual_seed(request.seed)
+    Args:
+        generation_params: Parâmetros para geração do vídeo
+        generator: Gerador opcional para reprodutibilidade
         
-        # Gera o vídeo com FastHunyuan
-        loop = asyncio.get_running_loop()
-        output = await loop.run_in_executor(
-            None,
-            lambda: video_generator(
-                prompt=request.prompt,
-                negative_prompt=request.negative_prompt,
-                height=request.height,
-                width=request.width,
-                num_frames=request.duration,
-                num_inference_steps=request.num_inference_steps,
-                guidance_scale=request.guidance_scale,
-                embedded_cfg_scale=request.embedded_cfg_scale,
-                flow_shift=request.flow_shift,
-                flow_reverse=request.flow_reverse,
-                generator=generator,
-                use_fp8=True
-            )
+    Returns:
+        torch.Tensor: Tensor do vídeo gerado
+    """
+    with gpu_memory_manager():
+        output = video_generator(
+            **generation_params,
+            generator=generator
         )
+        return output.videos[0]
+
+@app.post("/generate-video")
+@track_time(VIDEO_GENERATION_TIME)
+@track_errors("generation")
+async def generate_video(
+    request: VideoRequest,
+    token: str = Depends(verify_bearer_token)
+):
+    """
+    Gera um vídeo a partir do prompt fornecido usando FastHunyuan.
+    """
+    try:
+        # Valida request
+        request.validate_dimensions()
         
-        # Processa o vídeo gerado
-        video_frames = output.videos
+        # Carrega template se fornecido
+        if request.template_id:
+            template = load_template(request.template_id)
+            # Atualiza request com valores do template
+            for key, value in template.items():
+                if not getattr(request, key):
+                    setattr(request, key, value)
         
-        # Converte para MP4 usando torchvision
-        video_path = f"temp_{uuid.uuid4()}.mp4"
-        try:
-            torchvision.io.write_video(
-                video_path,
-                video_frames[0].permute(0, 2, 3, 1).cpu().numpy(),
-                fps=request.fps
+        # Prepara parâmetros
+        generation_params = {
+            "prompt": request.prompt,
+            "negative_prompt": request.negative_prompt,
+            "num_inference_steps": request.num_inference_steps,
+            "guidance_scale": request.guidance_scale,
+            "embedded_cfg_scale": request.embedded_cfg_scale,
+            "height": request.height,
+            "width": request.width,
+            "num_frames": request.duration,
+            "fps": request.fps,
+            "motion_bucket_id": request.motion_bucket_id,
+            "noise_aug_strength": request.noise_aug_strength
+        }
+        
+        # Valida parâmetros
+        validate_generation_params(generation_params)
+        
+        # Configura seed se fornecida
+        if request.seed is not None:
+            generator = torch.Generator(device=DEVICE)
+            generator.manual_seed(request.seed)
+        else:
+            generator = None
+            
+        resolution = f"{request.width}x{request.height}"
+        
+        # Contexto de métricas
+        with MetricsContext(resolution=resolution) as metrics:
+            # Executa geração de vídeo em uma thread separada
+            loop = asyncio.get_running_loop()
+            video = await loop.run_in_executor(
+                thread_pool,
+                _generate_video_sync,
+                generation_params,
+                generator
             )
             
-            # Faz upload para o MinIO
-            with open(video_path, "rb") as f:
-                video_bytes = f.read()
+            # Converte para bytes de forma assíncrona
+            video_bytes = await loop.run_in_executor(
+                thread_pool,
+                tensor_to_video,
+                video,
+                request.fps
+            )
             
-            file_name = f"video_{int(time.time())}_{uuid.uuid4()}.mp4"
-            url = upload_video_to_minio(video_bytes, file_name)
+            # Upload para MinIO de forma assíncrona
+            file_name = f"{uuid.uuid4()}_{int(time.time())}.mp4"
+            minio_url = await loop.run_in_executor(
+                thread_pool,
+                upload_to_minio,
+                video_bytes,
+                file_name
+            )
+            
+            # Atualiza métricas finais
+            BATCH_SIZE.set(1)  # Reset batch size
+            update_resource_metrics()
             
             return {
-                "status": "success",
-                "video_url": url,
-                "metadata": {
-                    "prompt": request.prompt,
-                    "negative_prompt": request.negative_prompt,
-                    "seed": request.seed,
+                "status": "sucesso",
+                "message": "Vídeo gerado com sucesso",
+                "minio_url": minio_url,
+                "params": {
+                    "resolution": resolution,
                     "duration": request.duration,
-                    "fps": request.fps,
-                    "dimensions": f"{request.width}x{request.height}",
-                    "quantization": "NF4" if USE_NF4 else "None",
-                    "model": "FastHunyuan",
-                    "flow_params": {
-                        "flow_shift": request.flow_shift,
-                        "flow_reverse": request.flow_reverse
-                    }
-                }
+                    "fps": request.fps
+                },
+                "metrics": get_metrics_snapshot()
             }
-        finally:
-            # Limpa arquivo temporário
-            if os.path.exists(video_path):
-                os.remove(video_path)
                 
-    except Exception as e:
+    except ValidationError as e:
+        raise HTTPException(
+            status_code=400,
+            detail=str(e)
+        )
+    except ResourceError as e:
+        raise HTTPException(
+            status_code=503,
+            detail=str(e)
+        )
+    except ProcessingError as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Erro na geração do vídeo: {str(e)}"
+            detail=str(e)
         )
+    except Exception as e:
+        logger.error(f"Erro inesperado: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erro interno do servidor: {str(e)}"
+        )
+
+def tensor_to_video(
+    video_tensor: torch.Tensor,
+    fps: int = 8
+) -> bytes:
+    """
+    Converte tensor do PyTorch para bytes de vídeo MP4.
+    
+    Args:
+        video_tensor: Tensor do vídeo (B,C,T,H,W)
+        fps: Frames por segundo
+        
+    Returns:
+        bytes: Vídeo em formato MP4
+    """
+    try:
+        # Remove batch dimension se presente
+        if video_tensor.dim() == 5:
+            video_tensor = video_tensor.squeeze(0)
+            
+        # Converte para uint8
+        video_tensor = (video_tensor * 255).to(torch.uint8)
+        
+        # Reorganiza dimensões para (T,H,W,C)
+        video_tensor = video_tensor.permute(1, 2, 3, 0)
+        
+        # Converte para numpy
+        video_array = video_tensor.cpu().numpy()
+        
+        # Salva como MP4
+        output_buffer = BytesIO()
+        
+        # Configura writer
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        writer = cv2.VideoWriter(
+            output_buffer,
+            fourcc,
+            fps,
+            (video_array.shape[2], video_array.shape[1])
+        )
+        
+        # Escreve frames
+        for frame in video_array:
+            writer.write(cv2.cvtColor(frame, cv2.COLOR_RGB2BGR))
+            
+        writer.release()
+        
+        return output_buffer.getvalue()
+        
+    except Exception as e:
+        raise ProcessingError(f"Erro ao converter vídeo: {str(e)}")
+
+def upload_to_minio(video_bytes: bytes, file_name: str) -> str:
+    """
+    Faz upload do vídeo para o MinIO.
+    
+    Args:
+        video_bytes: Bytes do vídeo
+        file_name: Nome do arquivo
+        
+    Returns:
+        str: URL do vídeo no MinIO
+    """
+    try:
+        # Configura bucket
+        bucket_name = os.getenv("MINIO_BUCKET", "videos")
+        if not minio_client.bucket_exists(bucket_name):
+            minio_client.make_bucket(bucket_name)
+            
+        # Upload
+        minio_client.put_object(
+            bucket_name,
+            file_name,
+            BytesIO(video_bytes),
+            len(video_bytes),
+            content_type="video/mp4"
+        )
+        
+        # Gera URL
+        url = minio_client.presigned_get_object(
+            bucket_name,
+            file_name,
+            expires=timedelta(hours=24)
+        )
+        
+        return url
+        
+    except Exception as e:
+        raise ProcessingError(f"Erro no upload para MinIO: {str(e)}")
+
+@app.get("/metrics")
+async def get_metrics():
+    """Endpoint para métricas Prometheus."""
+    return get_metrics_snapshot()
+
+@app.get("/health")
+async def health_check():
+    """Endpoint de verificação de saúde."""
+    try:
+        # Verifica GPU
+        gpu_ok = torch.cuda.is_available()
+        
+        # Verifica modelo
+        model_ok = video_generator is not None
+        
+        # Verifica MinIO
+        minio_ok = check_minio_connection()
+        
+        status = "healthy" if all([gpu_ok, model_ok, minio_ok]) else "degraded"
+        
+        return {
+            "status": status,
+            "gpu": {
+                "available": gpu_ok,
+                "device": torch.cuda.get_device_name(0) if gpu_ok else None
+            },
+            "model": {
+                "loaded": model_ok,
+                "device": str(next(video_generator.parameters()).device) if model_ok else None
+            },
+            "minio": {
+                "connected": minio_ok
+            },
+            "metrics": get_metrics_snapshot()
+        }
+        
+    except Exception as e:
+        return {
+            "status": "unhealthy",
+            "error": str(e)
+        }
 
 ######################################
 # 6. Endpoint de Redimensionamento de Vídeo

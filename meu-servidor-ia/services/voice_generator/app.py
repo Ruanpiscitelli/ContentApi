@@ -9,6 +9,7 @@ import hashlib
 from typing import Optional, Dict, Any, List
 from functools import lru_cache, partial
 import regex as re  # Usar regex Unicode
+import queue
 
 from fastapi import FastAPI, HTTPException, Header, Depends, UploadFile, File, status, Request
 from pydantic import BaseModel, Field
@@ -26,8 +27,9 @@ from minio.error import S3Error
 # Importações para métricas e monitoramento
 from prometheus_client import Counter, Histogram, start_http_server, generate_latest, REGISTRY
 
-# Importa a classe do FishSpeech (ajuste conforme a documentação oficial)
-from fishespeech import FishSpeechTTS
+# Importa as classes do Fish Speech
+# from fish_speech.inference_engine import TTSInferenceEngine
+# from fish_speech.models.vqgan.modules.firefly import FireflyArchitecture
 import torch
 
 # Adicionar imports
@@ -43,19 +45,191 @@ import contextlib
 # Importar o novo módulo de utilidades GPU
 from shared.gpu_utils import cuda_memory_manager, optimize_gpu_settings
 
+# Importações atualizadas
+# from TTS.api import TTS
+# from TTS.utils.synthesizer import Synthesizer
+# from TTS.tts.configs.shared_configs import TTSConfig
+# from TTS.tts.models import setup_model
+# from TTS.utils.audio import AudioProcessor
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
+import torch.cuda.amp as amp
+import onnxruntime as ort
+from rich.progress import Progress, SpinnerColumn, TextColumn
+from config import (
+    FISH_SPEECH_CONFIG,
+    RATE_LIMIT,
+    REDIS_CONFIG,
+    MINIO_CONFIG,
+    GENERATION_LIMITS,
+    GPU_CONFIG,
+    LOGGING_CONFIG,
+    MONITORING_CONFIG,
+    OPTIMIZATION_CONFIG,
+    CACHE_CONFIG,
+    SECURITY_CONFIG
+)
+from fish_speech_wrapper import FishSpeechWrapper
+
+# Adicionar imports necessários
+import pkg_resources
+import importlib.metadata
+
 # Configurar limiter após criar a app
 limiter = Limiter(key_func=get_remote_address)
-app = FastAPI()
+app = FastAPI(title="Fish Speech API", version="1.4.3")
 app.state.limiter = limiter
 
-# Adicionar middleware
-@app.middleware("http")
-async def rate_limit_middleware(request: Request, call_next):
+# Configurar CORS
+if SECURITY_CONFIG["enable_cors"]:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=SECURITY_CONFIG["allowed_origins"],
+        allow_methods=SECURITY_CONFIG["allowed_methods"],
+        allow_headers=SECURITY_CONFIG["allowed_headers"],
+        allow_credentials=SECURITY_CONFIG["allow_credentials"],
+        max_age=SECURITY_CONFIG["max_age"]
+    )
+
+# Configurar rate limiting
+if SECURITY_CONFIG["rate_limit_enabled"]:
+    limiter = Limiter(
+        key_func=get_remote_address,
+        default_limits=[f"{RATE_LIMIT['requests_per_minute']}/minute"]
+    )
+    app.state.limiter = limiter
+
+# Configurar cache Redis
+if CACHE_CONFIG["enable_cache"]:
+    import redis
+    cache = redis.from_url(
+        REDIS_CONFIG["url"],
+        encoding="utf-8",
+        decode_responses=True
+    )
+
+# Configurar MinIO
+minio_client = Minio(
+    MINIO_CONFIG["endpoint"],
+    access_key=MINIO_CONFIG["access_key"],
+    secret_key=MINIO_CONFIG["secret_key"],
+    secure=MINIO_CONFIG["secure"]
+)
+
+# Configurar modelo Fish Speech
+fishspeech_model = None
+onnx_session = None
+
+# Inicializar BatchProcessor
+batch_processor = None
+
+def setup_gpu():
+    """Configura ambiente GPU com otimizações."""
+    if torch.cuda.is_available():
+        # Configurar dispositivos visíveis
+        os.environ["CUDA_VISIBLE_DEVICES"] = GPU_CONFIG["visible_devices"]
+        
+        # Otimizações CUDA
+        torch.backends.cudnn.benchmark = True
+        torch.backends.cudnn.enabled = True
+        
+        if GPU_CONFIG["memory_growth"]:
+            for device in range(torch.cuda.device_count()):
+                torch.cuda.set_per_process_memory_fraction(
+                    GPU_CONFIG["per_process_memory_fraction"],
+                    device
+                )
+        
+        logger.info(f"GPU disponível: {torch.cuda.get_device_name(0)}")
+    else:
+        logger.warning("GPU não disponível, usando CPU")
+
+def load_fishspeech_model():
+    """Carrega e otimiza o modelo Fish Speech."""
+    global fishspeech_model
+    
     try:
-        response = await limiter(request, call_next)
-        return response
-    except RateLimitExceeded:
-        raise HTTPException(status_code=429, detail="Too many requests")
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            transient=True
+        ) as progress:
+            task = progress.add_task("Carregando modelo...", total=None)
+            
+            # Carregar modelo usando o wrapper
+            model_path = FISH_SPEECH_CONFIG["model_path"]
+            fishspeech_model = FishSpeechWrapper(
+                model_path=model_path,
+                device="cuda" if torch.cuda.is_available() else "cpu",
+                use_fp16=FISH_SPEECH_CONFIG["use_fp16"]
+            )
+            
+            progress.update(task, completed=True)
+            
+        logger.info("Modelo Fish Speech carregado e otimizado com sucesso")
+        return fishspeech_model
+        
+    except Exception as e:
+        logger.error(f"Erro ao carregar modelo Fish Speech: {str(e)}")
+        raise RuntimeError(f"Falha ao carregar modelo Fish Speech: {str(e)}")
+
+@app.on_event("startup")
+async def startup_event():
+    """Inicializa recursos na inicialização da aplicação."""
+    global fishspeech_model, batch_processor
+    
+    try:
+        # Otimizar configurações de GPU
+        optimize_gpu_settings(
+            device_id=0,
+            memory_fraction=GPU_CONFIG["per_process_memory_fraction"],
+            benchmark=True
+        )
+        
+        # Inicializar modelo
+        fishspeech_model = FishSpeechWrapper(
+            model_path=FISH_SPEECH_CONFIG["model_path"],
+            device="cuda" if torch.cuda.is_available() else "cpu",
+            use_fp16=FISH_SPEECH_CONFIG["use_fp16"]
+        )
+        
+        # Inicializar BatchProcessor
+        from shared.cache_manager import VoiceCache
+        cache = VoiceCache(
+            embedding_cache_size=FISH_SPEECH_CONFIG["embedding_cache_size"],
+            result_cache_size=CACHE_CONFIG["max_size"],
+            embedding_ttl=CACHE_CONFIG["embedding_cache"]["ttl"],
+            result_ttl=CACHE_CONFIG["ttl"]
+        )
+        
+        batch_processor = BatchProcessor(
+            model=fishspeech_model,
+            cache_client=cache
+        )
+        
+        logger.info(
+            "Serviço inicializado com sucesso "
+            f"(GPU: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'CPU'})"
+        )
+        
+    except Exception as e:
+        logger.error(f"Erro na inicialização: {e}")
+        raise
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Limpa recursos ao encerrar a aplicação."""
+    global fishspeech_model, batch_processor
+    
+    if batch_processor:
+        batch_processor = None
+    
+    if fishspeech_model:
+        del fishspeech_model
+        fishspeech_model = None
+    
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
 
 ######################################
 # 1. Configuração de Métricas
@@ -100,7 +274,7 @@ MODEL_LOAD_TIME = Histogram(
 ######################################
 # 2. Configuração de Logging
 ######################################
-logging.basicConfig(level=logging.INFO)
+logging.config.dictConfig(LOGGING_CONFIG)
 logger = logging.getLogger(__name__)
 
 # Obtém o token da variável de ambiente
@@ -225,49 +399,6 @@ def load_template(template_id: str) -> dict:
 ######################################
 # 3. Integração com FishSpeech
 ######################################
-# Carrega o modelo FishSpeech globalmente para evitar recarregamentos repetidos
-fishspeech_model = None
-
-def load_fishespeech_model(model_path: str = "models/fishespeech"):
-    """
-    Carrega o modelo FishSpeech com otimizações para GPU.
-    """
-    global fishspeech_model
-    try:
-        fishspeech_model = FishSpeechTTS.from_pretrained(model_path)
-        if torch.cuda.is_available():
-            fishspeech_model = fishspeech_model.to("cuda")
-            # Habilitar otimização CUDA
-            torch.backends.cudnn.benchmark = True
-            torch.backends.cudnn.enabled = True
-            logger.info("Modelo FishSpeech carregado com suporte CUDA")
-        else:
-            logger.warning("GPU não disponível. Usando CPU para inferência.")
-    except Exception as e:
-        logger.error(f"Erro ao carregar o modelo FishSpeech: {str(e)}")
-        raise RuntimeError(f"Erro ao carregar o modelo FishSpeech: {str(e)}")
-    return fishspeech_model
-
-@app.on_event("startup")
-async def startup_event():
-    """
-    Inicializa o servidor de métricas e carrega o modelo.
-    """
-    # Inicia servidor de métricas Prometheus na porta 8001
-    start_http_server(8001)
-    load_fishespeech_model()
-
-    # Configurar executor global
-    MAX_WORKERS = min(32, (os.cpu_count() or 1) + 4)
-    executor = concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS)
-    app.state.executor = executor
-
-    # Adicionar na inicialização do app
-    optimize_gpu_settings()
-    
-    if not torch.cuda.is_available():
-        logger.warning("GPU não disponível. Performance será reduzida.")
-
 @lru_cache(maxsize=500)
 def get_cached_audio(text: str, params_hash: str) -> Optional[bytes]:
     current_hash = hashlib.sha256(
@@ -344,16 +475,15 @@ async def process_text_chunks(chunks: List[str], params: Dict[str, Any]) -> List
 async def generate_voice(
     request: VoiceRequest,
     token: str = Depends(verify_bearer_token),
-    sample: UploadFile = File(None)  # Opcional para geração básica
+    sample: UploadFile = File(None)
 ):
     """
-    Gera áudio a partir do texto fornecido utilizando FishSpeech (síntese básica).
-    Inclui otimizações de cache, batch processing e monitoramento.
+    Gera áudio a partir do texto fornecido utilizando FishSpeech com batch processing.
     """
     start_time = time.time()
     
     try:
-        # Se um template for informado, carrega-o e sobrescreve parâmetros/tempo
+        # Validar template e parâmetros
         if request.template_id:
             try:
                 template = load_template(request.template_id)
@@ -375,40 +505,72 @@ async def generate_voice(
             audio_bytes = cached_audio
         else:
             CACHE_MISSES.inc()
-            logger.info("Gerando novo áudio")
+            logger.info("Gerando novo áudio com batch processing")
             
-            # Divide o texto em chunks e processa em batch
-            MAX_CHUNK_SIZE = 1000
-            chunks = [processed_text[i:i + MAX_CHUNK_SIZE] 
-                     for i in range(0, len(processed_text), MAX_CHUNK_SIZE)]
+            # Divide o texto em chunks
+            chunks = split_text_smart(processed_text)
             
-            audio_chunks = await process_text_chunks(chunks, request.parametros)
+            # Processa chunks em batch
+            audio_futures = []
+            for chunk in chunks:
+                future = await batch_processor.add_to_batch(
+                    text=chunk,
+                    language=request.parametros.get("language", "auto"),
+                    params=request.parametros
+                )
+                audio_futures.append(future)
             
-            # Concatena todos os áudios resultantes
+            # Aguarda todos os chunks
+            audio_chunks = []
+            for future in audio_futures:
+                try:
+                    wav = await future
+                    audio_chunks.append(wav)
+                except Exception as e:
+                    logger.error(f"Erro no processamento de chunk: {e}")
+                    continue
+            
+            if not audio_chunks:
+                raise HTTPException(
+                    status_code=500,
+                    detail="Falha ao gerar áudio. Todos os chunks falharam."
+                )
+            
+            # Concatena os áudios
             combined = AudioSegment.empty()
-            for audio in audio_chunks:
-                segment = AudioSegment.from_file(BytesIO(audio), format="wav")
+            for wav in audio_chunks:
+                segment = AudioSegment(
+                    wav.cpu().numpy().tobytes(),
+                    frame_rate=FISH_SPEECH_CONFIG["sample_rate"],
+                    sample_width=2,
+                    channels=1
+                )
                 combined += segment
             
-            # Verifica se ultrapassa o tempo máximo permitido
+            # Verifica duração
             total_duration_seconds = len(combined) / 1000
             if total_duration_seconds > request.tempo_max:
                 raise HTTPException(
                     status_code=400,
-                    detail=f"A duração do áudio gerado ({int(total_duration_seconds)}s) excede o máximo permitido ({request.tempo_max}s)."
+                    detail=f"Duração do áudio ({int(total_duration_seconds)}s) excede o máximo permitido ({request.tempo_max}s)."
                 )
             
-            # Exporta o áudio final para buffer
+            # Exporta áudio final
             buf = BytesIO()
             combined.export(buf, format="wav")
             buf.seek(0)
             audio_bytes = buf.getvalue()
+            
+            # Cache do resultado
+            if CACHE_CONFIG["enable_cache"]:
+                cache_key = f"{processed_text}_{params_hash}"
+                batch_processor.cache.cache_result(cache_key, audio_bytes)
         
         # Upload para MinIO
         file_name = f"{uuid.uuid4()}_{int(time.time())}.wav"
         minio_url = upload_to_minio(audio_bytes, file_name)
         
-        # Registra tempo de processamento
+        # Registra métricas
         process_time = time.time() - start_time
         VOICE_GENERATION_TIME.observe(process_time)
         
@@ -417,7 +579,8 @@ async def generate_voice(
             "job_id": f"voz_{int(time.time())}",
             "message": f"Áudio gerado com sucesso (duração: {int(len(combined)/1000)}s).",
             "minio_url": minio_url,
-            "process_time": f"{process_time:.2f}s"
+            "process_time": f"{process_time:.2f}s",
+            "chunks_processados": len(audio_chunks) if 'audio_chunks' in locals() else 1
         }
         
     except Exception as e:
@@ -548,46 +711,56 @@ async def clone_voice_endpoint(
 # Adicionar contexto de GPU
 @contextlib.contextmanager
 def gpu_context(device_id: int = 0):
+    """Contexto otimizado para operações GPU."""
+    if not torch.cuda.is_available():
+        yield
+        return
+        
     with torch.cuda.device(device_id), \
          torch.cuda.stream(torch.cuda.Stream()), \
-         torch.inference_mode():
+         torch.inference_mode(), \
+         amp.autocast(enabled=OPTIMIZATION_CONFIG["use_mixed_precision"]):
         try:
+            if OPTIMIZATION_CONFIG["pin_memory"]:
+                torch.cuda.empty_cache()
             yield
         finally:
-            torch.cuda.empty_cache()
+            if OPTIMIZATION_CONFIG["pin_memory"]:
+                torch.cuda.empty_cache()
 
 def synthesize_voice(text: str, params: Dict[str, Any]) -> bytes:
-    """
-    Gera áudio WAV usando Fish Speech com suporte a múltiplos idiomas e controle de parâmetros.
-    """
+    """Gera áudio usando TTS com otimizações."""
     global fishspeech_model
+    
     if fishspeech_model is None:
-        raise RuntimeError("O modelo FishSpeech não está carregado.")
+        raise RuntimeError("Modelo não está carregado")
     
     try:
-        # Valida e ajusta os parâmetros
+        # Validar parâmetros
         validated_params = validate_params(params)
         
-        # Prepara os parâmetros para o modelo
+        # Preparar parâmetros
         model_params = {
             "text": text,
             "language": validated_params.get("language", "auto"),
+            "speaker": validated_params.get("speaker", None),
             "speed": validated_params.get("speed", 1.0),
-            "pitch": validated_params.get("pitch", 0.0),
-            "energy": validated_params.get("energy", 1.0),
         }
         
-        # Adiciona parâmetros opcionais se fornecidos
-        if "prompt_text" in validated_params and validated_params["prompt_text"]:
-            model_params["prompt_text"] = validated_params["prompt_text"]
-        
-        if "emotion" in validated_params and validated_params["emotion"]:
-            model_params["emotion"] = validated_params["emotion"]
-        
-        # Gera o áudio
+        # Gerar áudio
         with gpu_context():
-            audio_bytes = fishspeech_model.synthesize(**model_params)
-        return audio_bytes
+            wav = fishspeech_model.tts(**model_params)
+        
+        # Converter para bytes
+        buf = BytesIO()
+        AudioSegment(
+            wav.cpu().numpy().tobytes(), 
+            frame_rate=22050,
+            sample_width=2, 
+            channels=1
+        ).export(buf, format="wav")
+        
+        return buf.getvalue()
         
     except Exception as e:
         logger.error(f"Erro na síntese de voz: {str(e)}")
@@ -603,31 +776,34 @@ async def process_chunk(chunk: str, processed_sample: AudioSegment, params: dict
         )
 
 def clone_voice(text: str, sample_bytes: bytes, params: Dict[str, Any]) -> bytes:
-    """
-    Clona voz usando Fish Speech com suporte a zero-shot e few-shot.
-    """
+    """Clona voz usando TTS com suporte a voice cloning."""
     global fishspeech_model
+    
     if fishspeech_model is None:
-        raise RuntimeError("O modelo FishSpeech não está carregado.")
+        raise RuntimeError("Modelo não está carregado")
     
     try:
-        # Valida e ajusta os parâmetros
+        # Validar parâmetros
         validated_params = validate_params(params)
         
-        # Prepara os parâmetros para clonagem
-        clone_params = {
-            "text": text,
-            "reference_audio": sample_bytes,
-            "language": validated_params.get("language", "auto"),
-            "speed": validated_params.get("speed", 1.0),
-            "pitch": validated_params.get("pitch", 0.0),
-            "energy": validated_params.get("energy", 1.0),
-        }
-        
-        # Gera o áudio clonado
+        # Gerar áudio com clonagem
         with gpu_context():
-            audio_bytes = fishspeech_model.clone(**clone_params)
-        return audio_bytes
+            wav = fishspeech_model.tts_with_vc(
+                text=text,
+                speaker_wav=sample_bytes,
+                language=validated_params.get("language", "auto")
+            )
+        
+        # Converter para bytes
+        buf = BytesIO()
+        AudioSegment(
+            wav.cpu().numpy().tobytes(), 
+            frame_rate=22050,
+            sample_width=2, 
+            channels=1
+        ).export(buf, format="wav")
+        
+        return buf.getvalue()
         
     except Exception as e:
         logger.error(f"Erro na clonagem de voz: {str(e)}")
@@ -706,30 +882,48 @@ def split_text_smart(text: str, max_length: int = 100) -> list:
     
     return sentences
 
-@app.get("/healthcheck", include_in_schema=False)
+def get_package_version(package_name: str) -> str:
+    """
+    Obtém a versão instalada de um pacote Python.
+    Retorna 'unknown' se o pacote não for encontrado.
+    """
+    try:
+        return pkg_resources.get_distribution(package_name).version
+    except pkg_resources.DistributionNotFound:
+        try:
+            return importlib.metadata.version(package_name)
+        except importlib.metadata.PackageNotFoundError:
+            return "unknown"
+
+@app.get("/health")
 async def health_check():
-    test_cases = [
-        ("Modelo TTS", fishspeech_model is not None),
-        ("GPU Disponível", torch.cuda.is_available()),
-        ("Conexão MinIO", check_minio_connection()),
-        ("Conexão Cache", check_cache_connection()),
-        ("Memória Livre", psutil.virtual_memory().percent < 90)
-    ]
-    
-    failed = [name for name, status in test_cases if not status]
-    status_code = 200 if not failed else 503
-    
-    return {
-        "status": "ok" if not failed else "degraded",
-        "version": os.getenv("APP_VERSION", "1.0.0"),
-        "timestamp": datetime.utcnow().isoformat(),
-        "failed_components": failed,
-        "gpu_metrics": get_gpu_metrics(),
-        "system_metrics": {
-            "cpu": psutil.cpu_percent(),
-            "memory": psutil.virtual_memory()._asdict()
+    """Endpoint de verificação de saúde da aplicação que retorna versões dinâmicas."""
+    try:
+        # Obtém versões dos pacotes dinamicamente
+        dependencies = {
+            "torch": get_package_version("torch"),
+            "transformers": get_package_version("transformers"),
+            "fastapi": get_package_version("fastapi"),
+            "pydantic": get_package_version("pydantic"),
+            "fish_speech": get_package_version("fish_speech")
         }
-    }, status_code
+
+        # Obtém versão da aplicação do arquivo de configuração ou variável de ambiente
+        app_version = os.getenv("APP_VERSION", pkg_resources.get_distribution("voice_generator").version)
+
+        return {
+            "status": "healthy",
+            "version": app_version,
+            "dependencies": dependencies,
+            "gpu_available": torch.cuda.is_available(),
+            "cuda_version": torch.version.cuda if torch.cuda.is_available() else None
+        }
+    except Exception as e:
+        logger.error(f"Erro ao verificar saúde da aplicação: {str(e)}")
+        return {
+            "status": "degraded",
+            "error": str(e)
+        }
 
 @app.get("/metrics/voice")
 async def voice_metrics():

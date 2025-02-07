@@ -1,0 +1,7 @@
+# Dependências PyTorch (versão CPU para Mac)
+torch>=2.0.1
+torchaudio>=2.0.2
+
+# Otimizações
+einops>=0.7.0
+opt_einsum>=3.3.0 

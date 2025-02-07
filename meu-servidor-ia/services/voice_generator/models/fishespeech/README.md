@@ -25,17 +25,17 @@ python download_models.py
 Após o download, você terá:
 
 ```
-models/fishespeech/
-  ├── config.json
-  ├── model.pt
-  ├── tokenizer.json
-  └── tokenizer_config.json
+models/fish-speech-1.4/
+  ├── config.json           # Configuração do modelo
+  ├── pytorch_model.bin     # Pesos do modelo
+  ├── tokenizer.json        # Configuração do tokenizer
+  └── special_tokens_map.json
 ```
 
 ### Fonte dos Modelos
 
 Os modelos são baixados do repositório oficial do Fish Speech no Hugging Face:
-https://huggingface.co/fishaudio/fish-speech
+https://huggingface.co/fishaudio/fish-speech-1.4
 
 ### Notas
 

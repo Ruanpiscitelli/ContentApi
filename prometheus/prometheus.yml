@@ -1,0 +1,28 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  - job_name: 'dashboard'
+    static_configs:
+      - targets: ['dashboard_service:8000']
+
+  - job_name: 'image_generator'
+    static_configs:
+      - targets: ['image_generator_service:8000']
+
+  - job_name: 'voice_generator'
+    static_configs:
+      - targets: ['voice_generator_service:8000']
+
+  - job_name: 'video_generator'
+    static_configs:
+      - targets: ['video_generator_service:8000']
+
+  - job_name: 'video_editor'
+    static_configs:
+      - targets: ['video_editor_service:8000'] 
