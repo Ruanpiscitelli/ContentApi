@@ -112,22 +112,35 @@ def download_additional_assets(repo_identifier, target_dir):
     """
     additional_assets = {
         "John6666/ultimate-realistic-mix-v2-sdxl": [
-            # VAE otimizado do madebyollin
-            ("vae.safetensors", "https://huggingface.co/madebyollin/sdxl-vae-fp16-fix/resolve/main/sdxl.vae.safetensors"),
-            # VAE original como fallback
-            ("vae.original.safetensors", "https://huggingface.co/John6666/ultimate-realistic-mix-v2-sdxl/resolve/main/vae.safetensors")
+            # VAE padrão do SDXL
+            ("vae.safetensors", "https://huggingface.co/stabilityai/sdxl-vae/resolve/main/sdxl_vae.safetensors")
         ],
         "fishaudio/fish-speech-1.5": [
             ("tokenizer.json", "https://huggingface.co/fishaudio/fish-speech-1.5/resolve/main/tokenizer.json")
         ]
     }
+    
     if repo_identifier in additional_assets:
         assets = additional_assets[repo_identifier]
         for asset_filename, asset_url in assets:
             target_file = os.path.join(target_dir, asset_filename)
             if not os.path.exists(target_file):
-                download_file(asset_url, target_file)
-                print(f"Asset '{asset_filename}' baixado para {target_dir}.")
+                try:
+                    print(f"Tentando baixar {asset_filename} de {asset_url}")
+                    download_file(asset_url, target_file)
+                    print(f"Asset '{asset_filename}' baixado para {target_dir}.")
+                except Exception as e:
+                    print(f"Erro ao baixar {asset_filename}: {str(e)}")
+                    if "sdxl-vae" in asset_url:
+                        # Tenta URL alternativa para o VAE
+                        alt_url = "https://huggingface.co/madebyollin/sdxl-vae-fp16-fix/resolve/main/sdxl_vae.safetensors"
+                        try:
+                            print(f"Tentando URL alternativa: {alt_url}")
+                            download_file(alt_url, target_file)
+                            print(f"Asset '{asset_filename}' baixado da URL alternativa.")
+                        except Exception as e2:
+                            print(f"Erro também na URL alternativa: {str(e2)}")
+                            raise
             else:
                 print(f"Asset '{asset_filename}' já existe em {target_dir}, pulando o download.")
 
