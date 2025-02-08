@@ -25,6 +25,9 @@ Requisitos:
 import os
 import subprocess
 import sys
+import requests
+from requests.adapters import HTTPAdapter
+from requests.packages.urllib3.util.retry import Retry
 
 # Importa a biblioteca requests para download de assets adicionais.
 try:
@@ -68,41 +71,52 @@ def clone_repo(repo_identifier, target_dir):
     download_additional_assets(repo_identifier, target_dir)
 
 
+def create_session_with_retry():
+    """Cria uma sessão HTTP com retry automático."""
+    session = requests.Session()
+    retries = Retry(
+        total=5,
+        backoff_factor=0.1,
+        status_forcelist=[500, 502, 503, 504]
+    )
+    session.mount('https://', HTTPAdapter(max_retries=retries))
+    return session
+
+
 def download_file(url, target_file):
     """
-    Faz o download do arquivo a partir de uma URL e salva-o no caminho especificado.
-
-    Args:
-        url (str): URL do arquivo a ser baixado.
-        target_file (str): Caminho completo onde o arquivo será salvo.
+    Faz o download do arquivo com retry automático.
     """
     print(f"Baixando arquivo de {url} para {target_file} ...")
-    response = requests.get(url, stream=True)
-    if response.status_code == 200:
+    session = create_session_with_retry()
+    
+    try:
+        response = session.get(url, stream=True)
+        response.raise_for_status()
+        
+        total_size = int(response.headers.get('content-length', 0))
+        block_size = 8192
+        
         with open(target_file, "wb") as f:
-            for chunk in response.iter_content(chunk_size=8192):
+            for chunk in response.iter_content(chunk_size=block_size):
                 if chunk:
                     f.write(chunk)
-    else:
-        raise Exception(f"Falha ao baixar {url}. Status: {response.status_code}")
+                    
+    except requests.exceptions.RequestException as e:
+        raise Exception(f"Falha ao baixar {url}. Erro: {str(e)}")
 
 
 def download_additional_assets(repo_identifier, target_dir):
     """
-    Verifica se para o repositório há assets adicionais (como VAE ou Tokenizer)
-    e realiza o download dos mesmos se não existirem.
-
-    Args:
-        repo_identifier (str): Identificador do repositório no Hugging Face.
-        target_dir (str): Diretório onde o repositório foi clonado.
+    Verifica e baixa assets adicionais com URLs otimizadas.
     """
-    # Dicionário que associa repositórios aos seus assets extras.
     additional_assets = {
-        # Para o modelo SDXL (exemplo: ultimate-realistic-mix-v2-sdxl), baixa o VAE.
         "John6666/ultimate-realistic-mix-v2-sdxl": [
-            ("vae.pt", "https://huggingface.co/John6666/ultimate-realistic-mix-v2-sdxl/resolve/main/vae.pt")
+            # VAE otimizado do madebyollin
+            ("vae.safetensors", "https://huggingface.co/madebyollin/sdxl-vae-fp16-fix/resolve/main/sdxl.vae.safetensors"),
+            # VAE original como fallback
+            ("vae.original.safetensors", "https://huggingface.co/John6666/ultimate-realistic-mix-v2-sdxl/resolve/main/vae.safetensors")
         ],
-        # Para o Fish Speech, baixa o Tokenizer.
         "fishaudio/fish-speech-1.5": [
             ("tokenizer.json", "https://huggingface.co/fishaudio/fish-speech-1.5/resolve/main/tokenizer.json")
         ]
