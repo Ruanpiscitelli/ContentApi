@@ -1,0 +1,259 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block extra_head %}
+<style>
+    /* Variáveis de cores */
+    :root {
+        --bg-primary: #0f172a;
+        --bg-secondary: #1e293b;
+        --accent-primary: #3b82f6;
+        --accent-secondary: #60a5fa;
+        --text-primary: #f8fafc;
+        --text-secondary: #94a3b8;
+        --success: #22c55e;
+        --warning: #f59e0b;
+        --danger: #ef4444;
+    }
+
+    body {
+        background-color: var(--bg-primary);
+        color: var(--text-primary);
+    }
+
+    .card {
+        background-color: var(--bg-secondary);
+        border-radius: 1rem;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        transition: transform 0.2s;
+    }
+
+    .card:hover {
+        transform: translateY(-2px);
+    }
+
+    .stat-card {
+        padding: 1.5rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .stat-value {
+        font-size: 2rem;
+        font-weight: bold;
+        color: var(--accent-primary);
+    }
+
+    .status-badge {
+        padding: 0.25rem 0.75rem;
+        border-radius: 9999px;
+        font-size: 0.875rem;
+        font-weight: 500;
+    }
+
+    .status-healthy {
+        background-color: rgba(34, 197, 94, 0.2);
+        color: var(--success);
+    }
+
+    .status-warning {
+        background-color: rgba(245, 158, 11, 0.2);
+        color: var(--warning);
+    }
+
+    .status-error {
+        background-color: rgba(239, 68, 68, 0.2);
+        color: var(--danger);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <!-- Header -->
+    <div class="flex justify-between items-center mb-8">
+        <h1 class="text-2xl font-bold">Dashboard</h1>
+        <div class="flex items-center gap-4">
+            <span class="text-sm text-gray-400">Última atualização: {{ last_update }}</span>
+            <button onclick="location.reload()" class="bg-accent-primary hover:bg-accent-secondary px-4 py-2 rounded-lg text-sm">
+                Atualizar
+            </button>
+        </div>
+    </div>
+
+    <!-- Status dos Serviços -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        {% for service in services %}
+        <div class="card stat-card">
+            <div class="flex justify-between items-start">
+                <h3 class="text-lg font-medium">{{ service.name }}</h3>
+                <span class="status-badge status-{{ service.status }}">
+                    {{ service.status }}
+                </span>
+            </div>
+            <div class="stat-value">{{ service.requests_total }}</div>
+            <div class="text-sm text-gray-400">Requisições hoje</div>
+            <div class="mt-4 space-y-2">
+                <div class="flex justify-between text-sm">
+                    <span>Latência</span>
+                    <span>{{ service.latency }}ms</span>
+                </div>
+                <div class="flex justify-between text-sm">
+                    <span>Uso de GPU</span>
+                    <span>{{ service.gpu_usage }}%</span>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Gráficos -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <!-- Gráfico de Requisições -->
+        <div class="card p-6">
+            <h3 class="text-lg font-medium mb-4">Requisições por Serviço</h3>
+            <canvas id="requestsChart" height="300"></canvas>
+        </div>
+
+        <!-- Gráfico de Recursos -->
+        <div class="card p-6">
+            <h3 class="text-lg font-medium mb-4">Uso de Recursos</h3>
+            <canvas id="resourcesChart" height="300"></canvas>
+        </div>
+    </div>
+
+    <!-- Logs Recentes -->
+    <div class="card p-6">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-medium">Logs Recentes</h3>
+            <a href="/logs" class="text-accent-primary hover:text-accent-secondary text-sm">Ver todos</a>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead>
+                    <tr class="text-left text-sm text-gray-400">
+                        <th class="pb-4">Timestamp</th>
+                        <th class="pb-4">Serviço</th>
+                        <th class="pb-4">Nível</th>
+                        <th class="pb-4">Mensagem</th>
+                    </tr>
+                </thead>
+                <tbody class="text-sm">
+                    {% for log in logs %}
+                    <tr class="border-t border-gray-700">
+                        <td class="py-3">{{ log.timestamp }}</td>
+                        <td class="py-3">{{ log.service }}</td>
+                        <td class="py-3">
+                            <span class="status-badge status-{{ log.level }}">
+                                {{ log.level }}
+                            </span>
+                        </td>
+                        <td class="py-3">{{ log.message }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Configuração dos gráficos
+const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+        legend: {
+            position: 'bottom',
+            labels: {
+                color: '#94a3b8'
+            }
+        }
+    },
+    scales: {
+        y: {
+            beginAtZero: true,
+            grid: {
+                color: 'rgba(148, 163, 184, 0.1)'
+            },
+            ticks: {
+                color: '#94a3b8'
+            }
+        },
+        x: {
+            grid: {
+                color: 'rgba(148, 163, 184, 0.1)'
+            },
+            ticks: {
+                color: '#94a3b8'
+            }
+        }
+    }
+};
+
+// Gráfico de Requisições
+const requestsCtx = document.getElementById('requestsChart').getContext('2d');
+new Chart(requestsCtx, {
+    type: 'line',
+    data: {
+        labels: {{ timestamps|safe }},
+        datasets: [
+            {
+                label: 'Text Generation',
+                data: {{ text_requests }},
+                borderColor: '#3b82f6',
+                tension: 0.4
+            },
+            {
+                label: 'Image Generation',
+                data: {{ image_requests }},
+                borderColor: '#22c55e',
+                tension: 0.4
+            },
+            {
+                label: 'Voice Generation',
+                data: {{ voice_requests }},
+                borderColor: '#f59e0b',
+                tension: 0.4
+            },
+            {
+                label: 'Video Editor',
+                data: {{ video_requests }},
+                borderColor: '#ef4444',
+                tension: 0.4
+            }
+        ]
+    },
+    options: chartOptions
+});
+
+// Gráfico de Recursos
+const resourcesCtx = document.getElementById('resourcesChart').getContext('2d');
+new Chart(resourcesCtx, {
+    type: 'bar',
+    data: {
+        labels: ['CPU', 'Memória', 'GPU'],
+        datasets: [
+            {
+                label: 'Uso (%)',
+                data: [
+                    {{ cpu_usage }},
+                    {{ memory_usage }},
+                    {{ gpu_usage }}
+                ],
+                backgroundColor: [
+                    '#3b82f6',
+                    '#22c55e',
+                    '#f59e0b'
+                ]
+            }
+        ]
+    },
+    options: chartOptions
+});
+</script>
+{% endblock %} 

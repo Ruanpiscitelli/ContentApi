@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Dashboard{% endblock %}</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Alpine.js -->
+    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Tema escuro -->
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        'bg-primary': 'var(--bg-primary)',
+                        'bg-secondary': 'var(--bg-secondary)',
+                        'accent-primary': 'var(--accent-primary)',
+                        'accent-secondary': 'var(--accent-secondary)',
+                        'text-primary': 'var(--text-primary)',
+                        'text-secondary': 'var(--text-secondary)',
+                    }
+                }
+            }
+        }
+    </script>
+    
+    {% block extra_head %}{% endblock %}
+</head>
+<body class="bg-bg-primary text-text-primary min-h-screen">
+    <!-- Navbar -->
+    <nav class="bg-bg-secondary shadow-lg">
+        <div class="max-w-7xl mx-auto px-4">
+            <div class="flex justify-between h-16">
+                <div class="flex">
+                    <div class="flex-shrink-0 flex items-center">
+                        <a href="/" class="text-xl font-bold text-text-primary">
+                            Dashboard
+                        </a>
+                    </div>
+                    
+                    {% if user %}
+                    <div class="hidden sm:ml-6 sm:flex sm:space-x-8">
+                        <a href="/" class="border-accent-primary text-text-primary inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                            Home
+                        </a>
+                        <a href="/api-keys" class="border-transparent text-text-secondary hover:text-text-primary inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                            Chaves API
+                        </a>
+                        <a href="/logs" class="border-transparent text-text-secondary hover:text-text-primary inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                            Logs
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+                
+                <div class="flex items-center">
+                    {% if user %}
+                    <div class="ml-3 relative" x-data="{ open: false }">
+                        <div>
+                            <button @click="open = !open" class="max-w-xs bg-bg-secondary flex items-center text-sm rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent-primary">
+                                <span class="sr-only">Abrir menu do usuário</span>
+                                <img class="h-8 w-8 rounded-full" src="https://ui-avatars.com/api/?name={{ user.username }}&background=random" alt="">
+                            </button>
+                        </div>
+                        
+                        <div x-show="open" @click.away="open = false" class="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 bg-bg-secondary ring-1 ring-black ring-opacity-5 focus:outline-none">
+                            <a href="/profile" class="block px-4 py-2 text-sm text-text-secondary hover:bg-bg-primary">
+                                Perfil
+                            </a>
+                            <a href="/logout" class="block px-4 py-2 text-sm text-text-secondary hover:bg-bg-primary">
+                                Sair
+                            </a>
+                        </div>
+                    </div>
+                    {% else %}
+                    <a href="/login" class="text-text-secondary hover:text-text-primary">
+                        Entrar
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </nav>
+    
+    <!-- Content -->
+    <main class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        {% block content %}{% endblock %}
+    </main>
+    
+    <!-- Footer -->
+    <footer class="bg-bg-secondary shadow-lg mt-8">
+        <div class="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8">
+            <p class="text-center text-text-secondary text-sm">
+                Dashboard v1.0.0
+            </p>
+        </div>
+    </footer>
+    
+    {% block extra_js %}{% endblock %}
+</body>
+</html> 

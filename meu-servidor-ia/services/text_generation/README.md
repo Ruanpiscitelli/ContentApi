@@ -1,233 +1,156 @@
 # Serviço de Geração de Texto
 
-Este serviço fornece uma API compatível com OpenAI para geração de texto usando o vLLM.
+API compatível com OpenAI para geração de texto usando vLLM.
 
-## Estrutura do Serviço
+## Características
 
+- Compatível com a API OpenAI
+- Suporte a múltiplos modelos
+- Processamento em batch otimizado
+- Cache hierárquico
+- Rate limiting
+- Monitoramento via logs
+- Segurança com JWT
+- Suporte a function calling
+- Streaming de respostas
+- Tensor parallelism para múltiplas GPUs
+
+## Requisitos
+
+- Python 3.8+
+- CUDA 11.7+
+- 4x RTX 4090 (ou GPUs similares)
+- 64GB+ RAM
+- Ubuntu 22.04 ou superior
+
+## Instalação
+
+1. Clone o repositório:
+```bash
+git clone https://github.com/seu-usuario/meu-servidor-ia.git
+cd meu-servidor-ia/services/text_generation
 ```
-services/text_generation/
-├── app.py              # Aplicação FastAPI
-├── config.py           # Configurações do serviço
-├── requirements.txt    # Dependências Python
-├── Dockerfile         # Configuração do container
-├── k8s/               # Configurações Kubernetes
-└── README.md          # Esta documentação
+
+2. Crie um ambiente virtual:
+```bash
+python -m venv venv
+source venv/bin/activate  # Linux/Mac
+# ou
+.\venv\Scripts\activate  # Windows
+```
+
+3. Instale as dependências:
+```bash
+pip install -r requirements.txt
+```
+
+4. Configure as variáveis de ambiente:
+```bash
+cp .env.example .env
+# Edite .env com suas configurações
 ```
 
 ## Configuração
 
-### Variáveis de Ambiente
+O serviço pode ser configurado através do arquivo `config.py` ou variáveis de ambiente:
 
-- `API_TOKEN`: Token de autenticação da API
-- `VLLM_ENDPOINT`: URL do serviço vLLM (default: http://vllm:8000/v1/completions)
-- `TEXT_GEN_API_TOKEN`: Token específico para o serviço de geração de texto
-- `REDIS_URL`: URL do Redis para cache
-- `REDIS_PASSWORD`: Senha do Redis
+- `API_HOST`: Host da API (default: 0.0.0.0)
 - `API_PORT`: Porta da API (default: 8000)
-- `METRICS_PORT`: Porta para métricas Prometheus (default: 8001)
+- `JWT_SECRET_KEY`: Chave secreta para JWT
+- `CORS_ORIGINS`: Origens permitidas para CORS
 
-### Modelos Suportados
+## Uso
 
-O serviço suporta os seguintes modelos:
-- mistralai/Mistral-7B-v0.1
-- meta-llama/Llama-2-7b-chat-hf
-- meta-llama/Llama-2-13b-chat-hf
-- meta-llama/Llama-2-70b-chat-hf
-- tiiuae/falcon-7b
-- tiiuae/falcon-40b
-- mosaicml/mpt-7b
-- mosaicml/mpt-30b
-
-## API Endpoints
-
-### GET /v1/models
-
-Lista todos os modelos disponíveis.
-
-**Response:**
-```json
-{
-    "object": "list",
-    "data": [
-        {
-            "id": "mistralai/Mistral-7B-v0.1",
-            "object": "model",
-            "created": 1709913600,
-            "owned_by": "organization"
-        }
-    ]
-}
+1. Inicie o serviço:
+```bash
+python app.py
 ```
 
-### GET /v1/models/{model_id}
-
-Obtém informações sobre um modelo específico.
-
-**Response:**
-```json
-{
-    "model": "mistralai/Mistral-7B-v0.1",
-    "status": "loaded",
-    "gpu_memory_usage": 7.5,
-    "loaded_at": 1709913600.0
-}
+2. Acesse a documentação da API:
+```
+http://localhost:8000/docs
 ```
 
-### POST /v1/completions
+## Endpoints
 
-Gera texto usando o modelo especificado.
+### Chat Completions
 
-**Request:**
-```json
-{
-    "model": "mistralai/Mistral-7B-v0.1",
-    "prompt": "Escreva um poema sobre",
-    "max_tokens": 100,
-    "temperature": 0.7,
-    "top_p": 0.95,
-    "n": 1,
-    "stream": false,
-    "stop": ["\n\n"],
-    "presence_penalty": 0.0,
-    "frequency_penalty": 0.0
-}
-```
+- `POST /v1/chat/completions`: Gera texto a partir de um prompt
+- `POST /v1/chat/completions/stream`: Gera texto em streaming
 
-**Response:**
-```json
-{
-    "id": "cmpl-abc123",
-    "object": "text_completion",
-    "created": 1709913600,
-    "model": "mistralai/Mistral-7B-v0.1",
-    "choices": [
-        {
-            "text": "o mar azul...",
-            "index": 0,
-            "logprobs": null,
-            "finish_reason": "stop"
-        }
-    ],
-    "usage": {
-        "prompt_tokens": 5,
-        "completion_tokens": 20,
-        "total_tokens": 25
-    }
-}
-```
+### Modelos
 
-### GET /health
+- `GET /v1/models`: Lista modelos disponíveis
 
-Verifica o status do serviço.
+### Funções
 
-**Response:**
-```json
-{
-    "status": "ok",
-    "service": "text-generator",
-    "timestamp": 1709913600.0
-}
-```
-
-## Cache Redis
-
-O serviço utiliza Redis para cache das respostas com as seguintes configurações:
-- TTL padrão: 1 hora
-- Prefixo das chaves: "vllm:"
-- Política de memória: allkeys-lru
-- Limite de memória: 2GB
-
-## Rate Limiting
-
-O serviço implementa limites de requisições por modelo:
-- Modelos 7B: 100 req/min
-- Modelos 13B: 50 req/min
-- Modelos 30B: 40 req/min
-- Modelos 70B: 20 req/min
+- `GET /v1/functions`: Lista funções disponíveis
+- `POST /v1/functions/{name}`: Chama uma função
 
 ## Monitoramento
 
-- Métricas Prometheus expostas na porta 8001
-- Métricas disponíveis:
-  - `text_generation_seconds`: Histograma do tempo de geração
-  - `text_generation_errors_total`: Contador de erros
-  - `text_cache_hits_total`: Contador de hits no cache
-  - `text_cache_misses_total`: Contador de misses no cache
-  - Métricas de GPU via py3nvml
-  - Métricas de sistema via psutil
-  - Métricas OpenTelemetry
+O serviço registra métricas importantes nos logs:
 
-## Docker
+- Total de requisições
+- Duração das requisições
+- Total de tokens gerados
+- Hits/misses no cache
+- Uso de memória GPU
+- Total de erros
 
-Build da imagem:
+## Segurança
+
+O serviço implementa:
+
+- Autenticação JWT
+- Rate limiting por IP e token
+- Sanitização de entrada
+- Validação de parâmetros
+- CORS configurável
+
+## Cache
+
+Sistema de cache hierárquico com 3 níveis:
+
+1. Cache em memória (L1)
+2. Redis (L2)
+3. Disco (L3)
+
+## Otimizações
+
+- Tensor parallelism para múltiplas GPUs
+- Processamento em batch otimizado
+- Prefetch de modelos
+- Compressão de cache
+- Cleanup automático
+
+## Desenvolvimento
+
+1. Instale dependências de desenvolvimento:
 ```bash
-docker build -t text-generator .
+pip install -r requirements-dev.txt
 ```
 
-Executar o container:
+2. Execute testes:
 ```bash
-docker run -p 8006:8000 \
-  -e API_TOKEN=seu-token \
-  -e VLLM_ENDPOINT=http://vllm:8000/v1/completions \
-  text-generator
+pytest
 ```
 
-## Kubernetes
-
-Aplicar configurações:
+3. Verifique estilo:
 ```bash
-kubectl apply -f k8s/text-generation-deployment.yaml
-kubectl apply -f k8s/text-generation-service.yaml
+flake8
+black .
+isort .
 ```
 
-## Integração vLLM
+## Contribuindo
 
-O serviço se integra com o vLLM através da interface OpenAI API. O vLLM deve estar rodando em um container separado, configurado através da variável de ambiente `VLLM_ENDPOINT`.
+1. Fork o repositório
+2. Crie uma branch para sua feature
+3. Commit suas mudanças
+4. Push para a branch
+5. Abra um Pull Request
 
-### Exemplo de uso do vLLM no vast.ai:
+## Licença
 
-```bash
-docker run --gpus all -p 8000:8000 \
-  vllm/vllm-openai \
-  --model mistralai/Mistral-7B-v0.1 \
-  --host 0.0.0.0 \
-  --port 8000 \
-  --tensor-parallel-size 1 \
-  --gpu-memory-utilization 0.90 \
-  --max-num-batched-tokens 8192
-```
-
-### Exemplo de chamada à API usando curl:
-
-```bash
-curl -X POST http://localhost:8006/v1/completions \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer seu-token" \
-  -d '{
-    "model": "mistralai/Mistral-7B-v0.1",
-    "prompt": "Escreva um poema sobre o mar",
-    "max_tokens": 100,
-    "temperature": 0.7
-  }'
-```
-
-### Exemplo de chamada à API usando Python:
-
-```python
-import httpx
-
-async with httpx.AsyncClient() as client:
-    response = await client.post(
-        "http://localhost:8006/v1/completions",
-        headers={
-            "Authorization": "Bearer seu-token"
-        },
-        json={
-            "model": "mistralai/Mistral-7B-v0.1",
-            "prompt": "Escreva um poema sobre o mar",
-            "max_tokens": 100,
-            "temperature": 0.7
-        }
-    )
-    print(response.json())
-``` 
+MIT 

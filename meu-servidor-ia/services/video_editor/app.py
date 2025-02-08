@@ -1,3 +1,8 @@
+"""
+Módulo principal da API de edição de vídeo.
+Implementa endpoints e configurações do FastAPI.
+"""
+
 import asyncio
 import base64
 import json
@@ -12,16 +17,103 @@ from tempfile import TemporaryDirectory
 from io import BytesIO
 from typing import List, Optional, Dict, Any
 
-from fastapi import FastAPI, HTTPException, Header, Depends
+from fastapi import FastAPI, HTTPException, Header, Depends, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel, Field
 from minio import Minio
 from minio.error import S3Error
+
+from .config import MINIO_CONFIG, API_CONFIG
+from .security import verify_bearer_token
+from .models import Operation, VideoRequest, VideoEditRequest, SilenceCutRequest
+from .pipeline import VideoPipeline
+from .routers import video
 
 # Configuração do Logger
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI()
+# Inicializa FastAPI com configurações
+app = FastAPI(
+    title="Serviço de Edição de Vídeo",
+    description="API para edição e processamento de vídeos",
+    version="1.0.0",
+    docs_url="/docs",
+    redoc_url="/redoc"
+)
+
+# Adiciona CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=API_CONFIG["cors"]["origins"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"]
+)
+
+# Cliente MinIO
+minio_client = Minio(**MINIO_CONFIG)
+
+# Pipeline de processamento
+pipeline = VideoPipeline()
+
+# Inclui routers
+app.include_router(video.router)
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """Handler para erros de validação."""
+    return JSONResponse(
+        status_code=422,
+        content={
+            "detail": exc.errors(),
+            "body": exc.body
+        }
+    )
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    """Handler para exceções HTTP."""
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "detail": exc.detail
+        }
+    )
+
+@app.exception_handler(Exception)
+async def general_exception_handler(request: Request, exc: Exception):
+    """Handler para exceções gerais."""
+    logger.error(f"Erro não tratado: {str(exc)}", exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": "Erro interno do servidor"
+        }
+    )
+
+@app.on_event("startup")
+async def startup():
+    """Inicializa recursos na inicialização."""
+    # Inicializa pipeline
+    pipeline = VideoPipeline()
+    await pipeline.start()
+    
+@app.on_event("shutdown")
+async def shutdown():
+    """Libera recursos no desligamento."""
+    # Para pipeline
+    await pipeline.stop()
+
+@app.get("/health")
+async def health_check():
+    """Endpoint de verificação de saúde."""
+    return {
+        "status": "healthy",
+        "version": "1.0.0"
+    }
 
 # Configurações do MinIO (use variáveis de ambiente para produção)
 MINIO_CONFIG = {

@@ -1,17 +1,13 @@
 """
-Processador em batch para otimização de geração de voz
+Processador em batch para geração de voz.
 """
 import asyncio
-import time
-from typing import List, Dict, Any, Optional
-import torch
 import logging
+from typing import List, Optional, Dict, Any
 from dataclasses import dataclass
-from config import OPTIMIZATION_CONFIG, CACHE_CONFIG
-import redis
-import json
-import hashlib
-import numpy as np
+import torch
+from config import OPTIMIZATION_CONFIG
+from shared.gpu_utils import estimate_max_batch_size
 
 logger = logging.getLogger(__name__)
 
@@ -20,9 +16,9 @@ class BatchItem:
     """Item para processamento em batch."""
     text: str
     language: str
-    speaker_embedding: Optional[torch.Tensor] = None
-    params: Dict[str, Any] = None
-    future: asyncio.Future = None
+    speaker_embedding: Optional[torch.Tensor]
+    params: Dict[str, Any]
+    future: asyncio.Future
 
 class BatchProcessor:
     """
@@ -30,17 +26,26 @@ class BatchProcessor:
     Implementa um sistema de fila e cache de embeddings.
     """
     
-    def __init__(self, model, cache_client: redis.Redis):
-        self.model = model
+    def __init__(self, backend_manager, cache_client):
+        """
+        Inicializa o processador em batch.
+        
+        Args:
+            backend_manager: Gerenciador de backends de voz
+            cache_client: Cliente de cache Redis
+        """
+        self.backend_manager = backend_manager
         self.cache = cache_client
         self.batch_queue: List[BatchItem] = []
         self.processing = False
-        self.batch_size = OPTIMIZATION_CONFIG["batch_processing"]["optimal_batch_size"]
-        self.max_wait = OPTIMIZATION_CONFIG["batch_processing"]["max_batch_wait_time"]
         
-        # Cache de embeddings
-        self.embedding_cache_enabled = CACHE_CONFIG["embedding_cache"]["enabled"]
-        self.embedding_cache_ttl = CACHE_CONFIG["embedding_cache"]["ttl"]
+        # Configurar tamanho do batch
+        model_size_mb = 512  # Tamanho estimado do modelo em MB
+        self.batch_size = estimate_max_batch_size(
+            model_size_mb,
+            safety_factor=OPTIMIZATION_CONFIG.get("batch_safety_factor", 0.8)
+        )
+        self.max_wait = OPTIMIZATION_CONFIG["batch_processing"]["max_batch_wait_time"]
     
     async def add_to_batch(
         self,
@@ -73,99 +78,56 @@ class BatchProcessor:
         return future
     
     async def _delayed_process(self):
-        """Aguarda um tempo máximo antes de processar batch incompleto."""
+        """Aguarda um tempo antes de processar o batch, mesmo que incompleto."""
         if self.processing:
             return
             
         self.processing = True
-        await asyncio.sleep(self.max_wait)
-        
-        if self.batch_queue:
-            await self._process_batch()
-        
-        self.processing = False
+        try:
+            await asyncio.sleep(self.max_wait)
+            if self.batch_queue:
+                await self._process_batch()
+        finally:
+            self.processing = False
     
     async def _process_batch(self):
-        """Processa um batch de requisições."""
+        """Processa os itens em batch."""
         if not self.batch_queue:
             return
             
+        # Pega itens do batch atual
+        batch = self.batch_queue[:self.batch_size]
+        self.batch_queue = self.batch_queue[self.batch_size:]
+        
         try:
-            # Prepara batch
-            current_batch = self.batch_queue[:self.batch_size]
-            self.batch_queue = self.batch_queue[self.batch_size:]
-            
-            # Processa em batch
-            texts = [item.text for item in current_batch]
-            languages = [item.language for item in current_batch]
-            speaker_embeddings = [item.speaker_embedding for item in current_batch]
-            
-            # Gera áudios em batch
-            with torch.cuda.amp.autocast():
-                wavs = await asyncio.to_thread(
-                    self.model.tts_batch,
-                    texts=texts,
-                    languages=languages,
-                    speaker_embeddings=speaker_embeddings
-                )
-            
-            # Completa futures
-            for item, wav in zip(current_batch, wavs):
-                if not item.future.done():
-                    item.future.set_result(wav)
+            # Processa cada item do batch
+            for item in batch:
+                try:
+                    # Tenta gerar áudio
+                    audio = await self.backend_manager.generate(
+                        text=item.text,
+                        language=item.language,
+                        speaker_embedding=item.speaker_embedding,
+                        **item.params
+                    )
                     
+                    # Define resultado na Future
+                    if not item.future.done():
+                        item.future.set_result(audio)
+                        
+                except Exception as e:
+                    logger.error(f"Erro ao processar item do batch: {e}")
+                    if not item.future.done():
+                        item.future.set_exception(e)
+                        
         except Exception as e:
-            logger.error(f"Erro no processamento em batch: {e}")
-            # Falha todas as futures do batch em caso de erro
-            for item in current_batch:
+            logger.error(f"Erro ao processar batch: {e}")
+            # Em caso de erro, falha todas as Futures não completadas
+            for item in batch:
                 if not item.future.done():
                     item.future.set_exception(e)
-    
-    def cache_embedding(self, audio_hash: str, embedding: torch.Tensor):
-        """Armazena embedding no cache."""
-        if not self.embedding_cache_enabled:
-            return
-            
-        try:
-            # Serializa o tensor
-            embedding_bytes = embedding.cpu().numpy().tobytes()
-            
-            # Salva no Redis
-            self.cache.setex(
-                f"emb:{audio_hash}",
-                self.embedding_cache_ttl,
-                embedding_bytes
-            )
-        except Exception as e:
-            logger.warning(f"Erro ao cachear embedding: {e}")
-    
-    def get_cached_embedding(self, audio_hash: str) -> Optional[torch.Tensor]:
-        """Recupera embedding do cache."""
-        if not self.embedding_cache_enabled:
-            return None
-            
-        try:
-            # Tenta recuperar do Redis
-            embedding_bytes = self.cache.get(f"emb:{audio_hash}")
-            if embedding_bytes:
-                # Deserializa para tensor
-                embedding = torch.from_numpy(
-                    np.frombuffer(embedding_bytes, dtype=np.float32)
-                ).reshape(-1)
-                return embedding.to(self.model.device)
-        except Exception as e:
-            logger.warning(f"Erro ao recuperar embedding do cache: {e}")
         
-        return None
-    
-    @staticmethod
-    def get_audio_hash(audio_bytes: bytes) -> str:
-        """Gera hash único para o áudio."""
-        return hashlib.sha256(audio_bytes).hexdigest()
-    
-    def __del__(self):
-        """Cleanup ao destruir o objeto."""
-        # Cancela futures pendentes
-        for item in self.batch_queue:
-            if not item.future.done():
-                item.future.cancel() 
+        finally:
+            # Se ainda tem itens na fila, agenda próximo processamento
+            if self.batch_queue:
+                asyncio.create_task(self._process_batch()) 

@@ -1,3 +1,6 @@
+"""
+Serviço de geração de imagem usando Stable Diffusion.
+"""
 import os
 import uuid
 import time
@@ -10,6 +13,8 @@ from PIL import Image
 from fastapi import FastAPI, HTTPException, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.timeout import TimeoutMiddleware
+from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
 from contextlib import asynccontextmanager
@@ -26,16 +31,6 @@ from diffusers import (
     UniPCMultistepScheduler
 )
 
-from .monitoring import (
-    IMAGE_GENERATION_LATENCY,
-    BATCH_SIZE,
-    MetricsContext,
-    track_time,
-    track_errors,
-    update_resource_metrics,
-    get_metrics_snapshot
-)
-
 from .validations import (
     ValidationError,
     ResourceError,
@@ -48,10 +43,12 @@ from .validations import (
     load_and_validate_template
 )
 
-from .config import DEVICE
+from .config import DEVICE, API_CONFIG
 from .auth import verify_bearer_token
 from .storage import upload_to_minio, check_minio_connection
 from .utils import convert_image_to_bytes
+from .routers import image
+from .pipeline import initialize_models, cleanup_resources
 
 # Configurações de GPU e Otimizações
 DEVICE_CONFIG = {
@@ -78,38 +75,38 @@ MEMORY_CONFIG = {
 }
 
 # Configuração de logging
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Gerenciamento de lifecycle
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Gerencia o ciclo de vida da aplicação."""
-    try:
-        # Inicialização
-        optimize_torch_settings()
-        await initialize_models()
-        logger.info("Serviço inicializado com sucesso")
-        yield
-    finally:
-        # Limpeza
-        await cleanup_resources()
-        logger.info("Recursos liberados com sucesso")
+    """Gerencia o lifecycle da aplicação."""
+    # Startup
+    logger.info("Inicializando modelos...")
+    await initialize_models()
+    
+    yield
+    
+    # Shutdown
+    logger.info("Limpando recursos...")
+    await cleanup_resources()
 
-# Inicializa a aplicação FastAPI
+# Inicializa FastAPI
 app = FastAPI(
-    title="Serviço de Geração de Imagens",
-    description="API para geração de imagens usando modelos Stable Diffusion",
-    version="2.0.0",
+    title="Serviço de Geração de Imagem",
+    description="API para geração de imagens usando Stable Diffusion",
+    version="1.0.0",
     lifespan=lifespan
 )
 
-# Configuração de CORS
+# Configuração CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=os.getenv("ALLOWED_ORIGINS", "http://localhost").split(","),
+    allow_origins=API_CONFIG["cors_origins"],
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"],
-    max_age=3600
+    allow_headers=["*"]
 )
 
 # Adiciona middleware de timeout
@@ -238,8 +235,8 @@ class ImageRequest(BaseModel):
     """
     prompt: str = Field(..., min_length=1, max_length=1000)
     negative_prompt: Optional[str] = Field(default="", max_length=1000)
-    height: int = Field(default=512, ge=256, le=1024, multiple_of=8)
-    width: int = Field(default=512, ge=256, le=1024, multiple_of=8)
+    height: int = Field(default=512, ge=256, le=2048, multiple_of=8)
+    width: int = Field(default=512, ge=256, le=2048, multiple_of=8)
     num_inference_steps: int = Field(default=30, ge=1, le=150)
     guidance_scale: float = Field(default=7.5, ge=1.0, le=20.0)
     seed: Optional[int] = None
@@ -252,34 +249,36 @@ class ImageRequest(BaseModel):
     vae: Optional[VAEConfig] = None
     template_id: Optional[str] = None
     
+    # Novas configurações SDXL
+    refiner_model: Optional[str] = Field(
+        default=None,
+        description="Modelo refinador SDXL (ex: stabilityai/stable-diffusion-xl-refiner-1.0)"
+    )
+    refiner_steps: Optional[int] = Field(default=None, ge=1, le=50)
+    high_noise_fraction: Optional[float] = Field(default=0.8, ge=0.0, le=1.0)
+    style_preset: Optional[str] = None
+    prompt_2: Optional[str] = None
+    negative_prompt_2: Optional[str] = None
+    denoising_strength: Optional[float] = Field(default=0.7, ge=0.0, le=1.0)
+    image_guidance_scale: Optional[float] = Field(default=1.5, ge=0.0, le=10.0)
+    
     class Config:
         schema_extra = {
             "example": {
                 "prompt": "Uma paisagem montanhosa ao pôr do sol",
                 "negative_prompt": "blur, desfoque, baixa qualidade",
-                "height": 512,
-                "width": 768,
+                "height": 1024,
+                "width": 1024,
                 "num_inference_steps": 30,
                 "guidance_scale": 7.5,
                 "seed": 42,
                 "model": "stabilityai/stable-diffusion-xl-base-1.0",
                 "scheduler": "euler_a",
-                "controlnet": {
-                    "model_id": "lllyasviel/sd-controlnet-canny",
-                    "image": "base64_da_imagem",
-                    "scale": 0.8
-                },
-                "loras": [
-                    {
-                        "model_id": "seu_lora",
-                        "scale": 0.7
-                    }
-                ],
-                "vae": {
-                    "model_id": "stabilityai/sd-vae-ft-mse",
-                    "tiling": true
-                },
-                "template_id": "landscape_template"
+                "refiner_model": "stabilityai/stable-diffusion-xl-refiner-1.0",
+                "refiner_steps": 20,
+                "style_preset": "cinematic",
+                "prompt_2": "detalhado, alta resolução",
+                "negative_prompt_2": "borrado, pixelado"
             }
         }
 
@@ -324,6 +323,19 @@ AVAILABLE_SCHEDULERS = {
 def process_controlnet_image(image_url: Optional[str] = None, image_base64: Optional[str] = None, preprocessor: str = "canny", params: Dict = {}):
     """
     Processa a imagem para o ControlNet usando o pré-processador especificado.
+    
+    Preprocessadores suportados:
+    - canny: Detecção de bordas Canny
+    - depth: Estimativa de profundidade
+    - normal: Mapa de normais
+    - mlsd: Detecção de linhas
+    - hed: Detecção de bordas HED
+    - scribble: Conversão para desenho
+    - pose: Detecção de pose
+    - seg: Segmentação semântica
+    - ip2p: Image-to-image com preservação
+    - lineart: Conversão para line art
+    - softedge: Bordas suaves
     """
     try:
         # Carrega a imagem
@@ -338,39 +350,104 @@ def process_controlnet_image(image_url: Optional[str] = None, image_base64: Opti
 
         # Converte para numpy array
         image_np = np.array(image)
-
-        # Aplica o pré-processador
-        if preprocessor == "canny":
+        
+        # Preprocessadores que usam modelos do HuggingFace
+        hf_preprocessors = {
+            "depth": "depth-estimation",
+            "normal": "normal-estimation",
+            "hed": "hed-edge-detection",
+            "mlsd": "mlsd-line-detection",
+            "pose": "pose-estimation",
+            "seg": "semantic-segmentation",
+            "lineart": "line-art-detection",
+            "softedge": "soft-edge-detection"
+        }
+        
+        if preprocessor in hf_preprocessors:
+            from transformers import pipeline
+            pipe = pipeline(hf_preprocessors[preprocessor])
+            result = pipe(image)
+            
+            if preprocessor == "depth":
+                processed = result["depth"]
+                processed = np.array(processed)
+                processed = np.stack([processed, processed, processed], axis=-1)
+            elif preprocessor == "normal":
+                processed = result["prediction"]
+            elif preprocessor in ["hed", "mlsd", "lineart", "softedge"]:
+                processed = result["edges"]
+            elif preprocessor == "pose":
+                processed = result["keypoints"]
+            elif preprocessor == "seg":
+                processed = result["segmentation"]
+            else:
+                processed = result["prediction"]
+                
+        elif preprocessor == "canny":
+            # Parâmetros do Canny
             low_threshold = params.get("low_threshold", 100)
             high_threshold = params.get("high_threshold", 200)
-            processed = cv2.Canny(image_np, low_threshold, high_threshold)
+            
+            # Converte para escala de cinza
+            gray = cv2.cvtColor(image_np, cv2.COLOR_RGB2GRAY)
+            
+            # Aplica blur se solicitado
+            if params.get("blur", True):
+                gray = cv2.GaussianBlur(gray, (5, 5), 0)
+                
+            # Detecção de bordas
+            processed = cv2.Canny(gray, low_threshold, high_threshold)
             processed = processed[:, :, None]
             processed = np.concatenate([processed, processed, processed], axis=2)
-        elif preprocessor == "depth":
-            from transformers import pipeline
-            depth_estimator = pipeline("depth-estimation")
-            processed = depth_estimator(image)["depth"]
-            processed = np.array(processed)
-            processed = np.stack([processed, processed, processed], axis=-1)
-        elif preprocessor == "normal":
-            from transformers import pipeline
-            normal_estimator = pipeline("depth-estimation")
-            processed = normal_estimator(image)["prediction"]
-        elif preprocessor == "openpose":
-            # Implementar OpenPose
-            raise NotImplementedError("OpenPose ainda não implementado")
+            
         elif preprocessor == "scribble":
-            # Converte para escala de cinza e aplica detecção de bordas
+            # Converte para escala de cinza
             gray = cv2.cvtColor(image_np, cv2.COLOR_RGB2GRAY)
+            
+            # Aplica threshold adaptativo
             processed = cv2.adaptiveThreshold(
-                gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2
+                gray, 255,
+                cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+                cv2.THRESH_BINARY_INV,
+                params.get("block_size", 9),
+                params.get("c", 2)
             )
+            
+            # Aplica dilatação se solicitado
+            if params.get("dilate", True):
+                kernel = np.ones((2,2), np.uint8)
+                processed = cv2.dilate(processed, kernel, iterations=1)
+                
+            processed = processed[:, :, None]
+            processed = np.concatenate([processed, processed, processed], axis=2)
+            
+        elif preprocessor == "ip2p":
+            # Image-to-image com preservação
+            # Aplica uma combinação de bordas e estrutura
+            gray = cv2.cvtColor(image_np, cv2.COLOR_RGB2GRAY)
+            edges = cv2.Canny(gray, 100, 200)
+            
+            # Detecta estruturas com Sobel
+            sobelx = cv2.Sobel(gray, cv2.CV_64F, 1, 0, ksize=3)
+            sobely = cv2.Sobel(gray, cv2.CV_64F, 0, 1, ksize=3)
+            
+            # Combina as detecções
+            processed = np.sqrt(sobelx**2 + sobely**2)
+            processed = (processed * 255 / processed.max()).astype(np.uint8)
+            
+            # Combina com as bordas
+            processed = cv2.addWeighted(edges, 0.5, processed, 0.5, 0)
+            processed = processed[:, :, None]
+            processed = np.concatenate([processed, processed, processed], axis=2)
+            
         else:
             raise ValueError(f"Pré-processador '{preprocessor}' não suportado")
 
-        return Image.fromarray(processed)
+        return Image.fromarray(processed.astype(np.uint8))
+        
     except Exception as e:
-        raise RuntimeError(f"Erro no processamento da imagem: {str(e)}")
+        logger.error(f"Erro no processamento da imagem: {str(e)}")
+        raise ValidationError(f"Erro ao processar imagem: {str(e)}")
 
 ######################################
 # Otimizações de Memória e VRAM
@@ -689,11 +766,6 @@ async def generate_image(
             status_code=500,
             detail=f"Erro interno: {str(e)}"
         )
-
-@app.get("/metrics")
-async def get_metrics():
-    """Endpoint para métricas Prometheus."""
-    return get_metrics_snapshot()
 
 @app.get("/health")
 async def health_check():
@@ -1209,6 +1281,10 @@ async def generate_image_with_pipeline(request: ImageRequest, pipe):
             # Processa prompts
             processed_prompt = process_prompt(request.prompt)
             processed_negative_prompt = process_prompt(request.negative_prompt) if request.negative_prompt else None
+            
+            # Processa prompts secundários para SDXL
+            processed_prompt_2 = process_prompt(request.prompt_2) if request.prompt_2 else None
+            processed_negative_prompt_2 = process_prompt(request.negative_prompt_2) if request.negative_prompt_2 else None
 
             # Prepara argumentos
             generation_args = {
@@ -1220,6 +1296,18 @@ async def generate_image_with_pipeline(request: ImageRequest, pipe):
                 "guidance_scale": request.guidance_scale,
                 "generator": generator
             }
+            
+            # Adiciona argumentos específicos do SDXL
+            if processed_prompt_2:
+                generation_args["prompt_2"] = processed_prompt_2
+            if processed_negative_prompt_2:
+                generation_args["negative_prompt_2"] = processed_negative_prompt_2
+            if request.style_preset:
+                generation_args["style_preset"] = request.style_preset
+            if request.denoising_strength:
+                generation_args["denoising_strength"] = request.denoising_strength
+            if request.image_guidance_scale:
+                generation_args["image_guidance_scale"] = request.image_guidance_scale
 
             if controlnet_image:
                 generation_args["image"] = controlnet_image
@@ -1227,8 +1315,32 @@ async def generate_image_with_pipeline(request: ImageRequest, pipe):
 
             # Gera imagem com otimização de memória
             with torch.cuda.amp.autocast():
+                # Geração inicial
                 result = pipe(**generation_args)
                 image = result.images[0]
+                
+                # Aplica refinamento se solicitado
+                if request.refiner_model:
+                    refiner = await load_pipeline(request.refiner_model)
+                    refiner_steps = request.refiner_steps or request.num_inference_steps // 2
+                    
+                    refiner_args = {
+                        "prompt": processed_prompt,
+                        "negative_prompt": processed_negative_prompt,
+                        "image": image,
+                        "num_inference_steps": refiner_steps,
+                        "guidance_scale": request.guidance_scale,
+                        "generator": generator,
+                        "high_noise_fraction": request.high_noise_fraction
+                    }
+                    
+                    if processed_prompt_2:
+                        refiner_args["prompt_2"] = processed_prompt_2
+                    if processed_negative_prompt_2:
+                        refiner_args["negative_prompt_2"] = processed_negative_prompt_2
+                    
+                    result = refiner(**refiner_args)
+                    image = result.images[0]
 
             # Salva e faz upload
             buffered = BytesIO()
@@ -1250,7 +1362,11 @@ async def generate_image_with_pipeline(request: ImageRequest, pipe):
                     "clip_skip": request.clip_skip if hasattr(request, 'clip_skip') else None,
                     "optimization": request.optimization if hasattr(request, 'optimization') else None,
                     "processed_prompt": processed_prompt,
-                    "processed_negative_prompt": processed_negative_prompt
+                    "processed_negative_prompt": processed_negative_prompt,
+                    "style_preset": request.style_preset,
+                    "refiner_model": request.refiner_model,
+                    "refiner_steps": request.refiner_steps,
+                    "high_noise_fraction": request.high_noise_fraction
                 }
             }
     except Exception as e:
@@ -1488,3 +1604,35 @@ async def cleanup_resources():
     MODEL_CACHE.clear()
     CONTROLNET_CACHE.clear()
     VAE_CACHE.clear()
+
+# Handlers de exceção globais
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """Handler para erros de validação."""
+    return JSONResponse(
+        status_code=422,
+        content={
+            "detail": exc.errors(),
+            "body": exc.body
+        }
+    )
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    """Handler para exceções HTTP."""
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail}
+    )
+
+@app.exception_handler(Exception)
+async def general_exception_handler(request: Request, exc: Exception):
+    """Handler para exceções não tratadas."""
+    logger.error(f"Erro não tratado: {exc}", exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Erro interno do servidor"}
+    )
+
+# Inclui routers
+app.include_router(image.router)

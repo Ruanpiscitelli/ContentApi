@@ -1,6 +1,5 @@
 """
-Configurações para o serviço de geração de voz usando Fish Speech.
-Inclui todas as configurações necessárias para o modelo e otimizações.
+Configurações para o serviço de geração de voz com suporte a Fish Audio SDK.
 """
 import os
 from pathlib import Path
@@ -8,75 +7,169 @@ import torch
 
 # Diretórios Base
 BASE_DIR = Path(__file__).parent.absolute()
-MODEL_DIR = BASE_DIR / "models/fish-speech-1.5"
+LOGS_DIR = BASE_DIR / "logs"
+MODELS_DIR = BASE_DIR / "models"
 CACHE_DIR = BASE_DIR / "cache"
-REFERENCES_DIR = BASE_DIR / "references"
 TEMP_DIR = BASE_DIR / "temp"
 
-# Configurações do Fish Speech
-FISH_SPEECH_CONFIG = {
-    "model_path": BASE_DIR / "models/fish-speech-1.5",
-    "use_fp16": True,
-    "batch_size": 16,
-    "max_wav_length": 1000000,
-    "speaker_embedding_dim": 256,
-    "supported_languages": ["auto", "en", "zh", "ja", "ko", "fr", "de", "es", "pt"],
-    "cache_embeddings": True,
-    "embedding_cache_size": 1000,
-    "sample_rate": 16000,
-    "max_reference_duration": 30,  # segundos
-    "voice_clone": {
-        "enabled": True,
-        "reference_audio_max_size": 5 * 1024 * 1024,  # 5MB
-        "supported_formats": ["wav", "mp3", "ogg", "flac"]
-    }
-}
+# Criar diretórios necessários
+for dir in [LOGS_DIR, MODELS_DIR, CACHE_DIR, TEMP_DIR]:
+    dir.mkdir(parents=True, exist_ok=True)
 
 # Configurações de API
 API_TOKEN = os.getenv("API_TOKEN")
+FISH_AUDIO_API_KEY = os.getenv("FISH_AUDIO_API_KEY")
 API_HOST = os.getenv("API_HOST", "0.0.0.0")
 API_PORT = int(os.getenv("API_PORT", "8000"))
-METRICS_PORT = int(os.getenv("METRICS_PORT", "8001"))
 
-# Rate Limiting
-RATE_LIMIT = {
-    "requests_per_minute": int(os.getenv("RATE_LIMIT_RPM", "60")),
-    "burst_size": int(os.getenv("RATE_LIMIT_BURST", "10"))
+# Configurações Fish Audio
+FISH_AUDIO_CONFIG = {
+    "base_url": os.getenv("FISH_AUDIO_URL", "https://api.fish.audio"),
+    "timeout": 30,
+    "max_retries": 3,
+    "async_mode": True,
+    "api_key": os.getenv("FISH_AUDIO_API_KEY"),
+    "models": {
+        "default": "fish-speech-v1",
+        "available": [
+            "fish-speech-v1",
+            "fish-speech-v2",
+            "fish-speech-multilingual"
+        ]
+    },
+    "reference_audio": {
+        "max_duration": 30,  # segundos
+        "formats": ["wav", "mp3", "ogg", "flac"],
+        "sample_rate": 22050,
+        "normalize_audio": True
+    }
 }
 
-# Cache Redis
+# Configurações FishSpeech Local
+FISH_SPEECH_CONFIG = {
+    "model_path": str(MODELS_DIR / "fish-speech-1.5" / "firefly-gan-vq-fsq-8x1024-21hz-generator.pth"),
+    "use_fp16": True,
+    "device": "cuda" if torch.cuda.is_available() else "cpu",
+    "embedding_cache_size": 1000,
+    "sample_rate": 22050,
+    "max_wav_length": 30  # segundos
+}
+
+# Cache
+CACHE_CONFIG = {
+    "enable_cache": True,
+    "ttl": 3600,  # 1 hora
+    "max_size": 1000,  # Máximo de itens no cache
+    "embedding_cache": {
+        "ttl": 86400,  # 24 horas
+        "max_size": 1000  # Máximo de embeddings
+    },
+    "policies": {
+        "eviction": "lru",  # least recently used
+        "compression": True,  # Comprime dados antes de armazenar
+        "serialization": "pickle"  # Formato de serialização
+    },
+    "monitoring": {
+        "track_hits": True,
+        "track_misses": True,
+        "track_size": True,
+        "track_latency": True
+    },
+    "cleanup": {
+        "interval": 3600,  # Intervalo de limpeza em segundos
+        "max_age": 86400  # Idade máxima dos itens em segundos
+    }
+}
+
+# Redis
 REDIS_CONFIG = {
-    "url": os.getenv("REDIS_URL", "redis://localhost:6379"),
-    "password": os.getenv("REDIS_PASSWORD", None),
-    "db": int(os.getenv("REDIS_DB", "0"))
+    "url": os.getenv("REDIS_URL", "redis://redis:6379"),
+    "db": 0,
+    "prefix": "voice_gen:",
+    "ttl": 3600,  # 1 hora
+    "max_memory": "2gb",
+    "policies": {
+        "embeddings": {
+            "ttl": 86400,  # 24 horas
+            "max_size": 1000
+        },
+        "audio": {
+            "ttl": 3600,  # 1 hora
+            "max_size": 100
+        }
+    },
+    "pool": {
+        "max_connections": 10,
+        "timeout": 20,
+        "retry_on_timeout": True
+    },
+    "ssl": {
+        "enabled": False,
+        "cert_reqs": "required",
+        "ca_certs": None
+    }
 }
 
 # MinIO Storage
 MINIO_CONFIG = {
-    "endpoint": os.getenv("MINIO_ENDPOINT", "localhost:9000"),
-    "access_key": os.getenv("MINIO_ACCESS_KEY", "minioadmin"),
-    "secret_key": os.getenv("MINIO_SECRET_KEY", "minioadmin"),
-    "secure": os.getenv("MINIO_SECURE", "false").lower() == "true",
-    "bucket_name": os.getenv("MINIO_BUCKET", "audio-files")
+    "endpoint": os.getenv("MINIO_ENDPOINT", "minio:9000"),
+    "access_key": os.getenv("MINIO_ACCESS_KEY"),
+    "secret_key": os.getenv("MINIO_SECRET_KEY"),
+    "secure": True,
+    "bucket_name": "audio-files",
+    "url_expiry": 7200,  # 2 horas
+    "file_types": {
+        "audio": ["wav", "mp3", "ogg", "flac"],
+        "models": ["pt", "bin", "onnx"]
+    }
 }
 
-# Limites e Configurações de Geração
+# Limites e Configurações
 GENERATION_LIMITS = {
-    "max_text_length": 5000,
-    "max_audio_duration": 1200,  # segundos
-    "max_batch_size": 10
+    "max_text_length": 1000,
+    "max_audio_duration": 300,  # 5 minutos
+    "max_concurrent_requests": 50,
+    "max_batch_size": 16,
+    "timeout": 60,
+    "rate_limit": {
+        "requests_per_minute": 100,
+        "burst": 20
+    }
 }
 
-# Configurações de GPU
-GPU_CONFIG = {
-    "visible_devices": os.getenv("CUDA_VISIBLE_DEVICES", "0"),
-    "memory_growth": True,
-    "per_process_memory_fraction": 0.9,
-    "mixed_precision": True,
-    "optimize_transformers": True
+# Otimizações
+OPTIMIZATION_CONFIG = {
+    "use_mixed_precision": True,
+    "pin_memory": True,
+    "num_workers": 4,
+    "batch_processing": True,
+    "prefetch_factor": 2,
+    "cuda_graphs": True
 }
 
-# Configurações de Logging
+# Templates de Voz
+VOICE_TEMPLATES = {
+    "default": {
+        "speed": 1.0,
+        "pitch": 0.0,
+        "energy": 1.0,
+        "language": "auto"
+    },
+    "fast": {
+        "speed": 1.3,
+        "pitch": 0.0,
+        "energy": 1.2,
+        "language": "auto"
+    },
+    "slow": {
+        "speed": 0.8,
+        "pitch": -0.2,
+        "energy": 0.9,
+        "language": "auto"
+    }
+}
+
+# Logging
 LOGGING_CONFIG = {
     "version": 1,
     "disable_existing_loggers": False,
@@ -84,6 +177,10 @@ LOGGING_CONFIG = {
         "default": {
             "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
             "datefmt": "%Y-%m-%d %H:%M:%S"
+        },
+        "json": {
+            "class": "pythonjsonlogger.jsonlogger.JsonFormatter",
+            "format": "%(asctime)s %(name)s %(levelname)s %(message)s"
         }
     },
     "handlers": {
@@ -93,9 +190,11 @@ LOGGING_CONFIG = {
             "level": "INFO"
         },
         "file": {
-            "class": "logging.FileHandler",
-            "filename": "logs/voice_service.log",
-            "formatter": "default",
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": str(LOGS_DIR / "voice_service.log"),
+            "formatter": "json",
+            "maxBytes": 10485760,  # 10MB
+            "backupCount": 5,
             "level": "INFO"
         }
     },
@@ -105,68 +204,43 @@ LOGGING_CONFIG = {
     }
 }
 
-# Configurações de Monitoramento
+# Monitoramento
 MONITORING_CONFIG = {
     "enable_prometheus": True,
-    "metrics_port": int(os.getenv("METRICS_PORT", "9090")),
-    "enable_tensorboard": True,
-    "tensorboard_dir": "logs/tensorboard",
-    "profile_inference": True
-}
-
-# Configurações de Otimização
-OPTIMIZATION_CONFIG = {
-    "num_threads": int(os.getenv("NUM_THREADS", "4")),
-    "use_mixed_precision": True,
-    "pin_memory": True,
-    "optimize_cuda_graphs": True,
-    "enable_cudnn_benchmark": True,
-    "enable_cuda_malloc_async": True,
-    "batch_processing": {
-        "enabled": True,
-        "optimal_batch_size": 16,
-        "max_batch_size": 32,
-        "min_batch_size": 4,
-        "max_batch_wait_time": 0.2
+    "metrics_port": 8001,
+    "profile_inference": True,
+    "metrics": {
+        "latency_window": 100,
+        "memory_window": 60,
+        "audio_quality_metrics": True,
+        "voice_similarity_metrics": True,
+        "custom_metrics": {
+            "generation_time": True,
+            "cache_hit_rate": True,
+            "voice_clone_success_rate": True,
+            "audio_length_distribution": True
+        }
     },
-    "memory_optimization": {
-        "use_fp16": True,
-        "use_tf32": True,
-        "use_flash_attention": True,
-        "use_memory_efficient_attention": True,
-        "optimize_cudnn": True,
-        "optimize_cuda_graphs": True
-    },
-    "performance": {
-        "num_workers": 4,
-        "prefetch_factor": 2,
-        "pin_memory": True,
-        "non_blocking": True,
-        "use_cuda_events": True
+    "alerting": {
+        "enable_alerts": True,
+        "latency_threshold_ms": 2000,
+        "error_rate_threshold": 0.01,
+        "memory_threshold": 0.95
     }
 }
 
-# Configurações de Cache
-CACHE_CONFIG = {
-    "enable_cache": True,
-    "ttl": 3600,  # 1 hora
-    "max_size": 1000,  # número máximo de itens em cache
-    "embedding_cache": {
-        "enabled": True,
-        "max_size": 500,
-        "ttl": 7200  # 2 horas
+# Configurações de Backend
+BACKEND_CONFIG = {
+    "fallback_enabled": True,
+    "fallback_timeout": 10,  # segundos
+    "retry_attempts": 3,
+    "retry_delay": 2,  # segundos
+    "preferred_backend": "local",  # "local" ou "api"
+    "cache_embeddings": True,
+    "cache_results": True,
+    "monitoring": {
+        "track_latency": True,
+        "track_errors": True,
+        "track_cache_hits": True
     }
-}
-
-# Configurações de Segurança
-SECURITY_CONFIG = {
-    "rate_limit_enabled": True,
-    "enable_cors": True,
-    "allowed_origins": ["*"],
-    "allowed_methods": ["*"],
-    "allowed_headers": ["*"],
-    "allow_credentials": True,
-    "max_age": 600,
-    "token_expiration": 3600,
-    "max_token_uses": 1000
 } 

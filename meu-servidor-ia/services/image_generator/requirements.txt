@@ -1,40 +1,41 @@
-# FastAPI e dependências
-fastapi>=0.104.0
-uvicorn>=0.24.0
-gunicorn>=21.2.0
-pydantic>=2.5.0
-python-multipart>=0.0.6
-itsdangerous>=2.1.2
-
-# Dependências de AI e GPU
-torch>=2.1.0
-torchvision>=0.16.0
+# Dependências principais
+fastapi>=0.68.0
+uvicorn>=0.15.0
+pydantic>=1.8.0
 diffusers>=0.25.0
-transformers>=4.36.0
-accelerate>=0.25.0
-xformers>=0.0.23
-bitsandbytes>=0.41.1
-safetensors>=0.4.0
+transformers>=4.30.0
+torch>=2.0.0
+accelerate>=0.20.0
+safetensors>=0.3.0
 
-# Processamento de Imagem
-pillow>=10.1.0
+# Processamento de imagem
+Pillow>=9.0.0
+opencv-python>=4.7.0
 numpy>=1.24.0
+scikit-image>=0.19.0
+controlnet-aux>=0.0.6
+timm>=0.6.0
 
-# Armazenamento e Cache
-minio>=7.2.0
-redis>=5.0.0
+# Cache e otimização
+redis>=4.0.0
+cachetools>=5.0.0
+msgpack>=1.0.0
+lz4>=4.0.0
 
-# Monitoramento e Métricas
-prometheus-client>=0.19.0
-nvidia-ml-py3>=7.352.0
+# Monitoramento e métricas
+psutil>=5.9.0
+py3nvml>=0.2.7
 
-# Configuração e Utilitários
-python-dotenv>=1.0.0
-orjson>=3.9.0
-tenacity>=8.2.0
-circuitbreaker>=2.0.0
+# Logging
+python-json-logger>=2.0.0
+rich>=10.0.0
 
-# Otimizações
-sse-starlette>=1.6.5
-aiohttp>=3.9.0
-httpx>=0.25.0
+# Storage
+minio>=7.1.0
+python-multipart>=0.0.5
+
+# Utilitários
+python-dotenv>=0.19.0
+httpx>=0.23.0
+tenacity>=8.0.0
+orjson>=3.6.0 

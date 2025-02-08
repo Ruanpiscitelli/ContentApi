@@ -1,77 +1,34 @@
---index-url https://pypi.org/simple
+# FastAPI e dependências
+fastapi>=0.68.0
+uvicorn[standard]>=0.15.0
+python-multipart>=0.0.5
+pydantic>=1.8.2
 
-# Importar dependências base
--r requirements-base.txt
+# Fish Speech e dependências
+torch>=2.0.0
+torchaudio>=2.0.0
+numpy>=1.21.0
+pydub>=0.25.1
+librosa>=0.9.0
+soundfile>=0.10.3
+huggingface-hub>=0.12.0
 
-# Dependências core
-# Otimizações nativas PyTorch
-einops>=0.7.0
-opt_einsum>=3.3.0
-numpy<2
-scipy<1.11.0
+# Clientes HTTP e cache
+aiohttp>=3.8.0
+redis>=4.3.0
+minio>=7.1.0
+cachetools>=5.0.0
+msgpack>=1.0.3
+lz4>=4.0.0
 
-# APIs e ferramentas
-fastapi>=0.104.1
-uvicorn>=0.24.0
-uvloop==0.17.0
-httptools>=0.5.0
-h11>=0.8.0
-websockets>=10.4
-python-multipart==0.0.9
-pydantic==2.9.2
-gunicorn==20.1.0
-slowapi==0.1.8
-aiohttp==3.9.3
+# Monitoramento e logging
+prometheus-client>=0.14.0
+python-json-logger>=2.0.0
+rich>=10.0.0
+psutil>=5.9.0
+py3nvml>=0.2.7
 
-# Processamento de áudio
-soundfile==0.12.1
-pydub==0.25.1
-pyworld>=0.3.5
-praat-parselmouth>=0.4.3
-resampy>=0.4.3
-audioread>=3.0.1
-librosa==0.10.0.post2
-
-# Armazenamento & Cache
-minio>=7.1.4
-redis>=5.0.1
-cachetools
-ormsgpack
-
-# Monitoramento
-prometheus_client==0.20.0
-psutil==5.9.8
-pynvml==11.5.0
-loguru>=0.6.0
-
-# Fish Speech Core
-einops>=0.7.0
-einx[torch]==0.2.2
-omegaconf>=2.3.0
-rich>=13.5.3
-grpcio>=1.58.0
-kui>=1.6.0
-pyrootutils>=1.0.4
-huggingface_hub==0.17.3
-phonemizer>=3.2.0
-
-# Processamento de texto & Multilíngue
-pypinyin==0.49.0
-jieba==0.42.1
-inflect==5.6.0
-cn2an==0.5.22
-regex==2023.12.25
-python-dotenv==1.0.0
-opencc-python-reimplemented==0.1.7
-tiktoken>=0.8.0
-zstandard>=0.22.0
-natsort>=8.4.0
-
-# Otimização
-onnx>=1.15.0
-onnxruntime>=1.16.0
-
-# Dependências específicas
-transformers==4.33.3
-faster-whisper==0.8.0
-tokenizers==0.13.3
+# Utilitários
+python-dotenv>=0.19.0
+regex>=2022.3.15
+tenacity>=8.0.1 

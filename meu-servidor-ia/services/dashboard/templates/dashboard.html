@@ -1,0 +1,184 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Função para formatar bytes em uma unidade legível
+    function formatBytes(bytes, decimals = 2) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const dm = decimals < 0 ? 0 : decimals;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+    }
+
+    // Atualiza as estatísticas do sistema a cada 5 segundos
+    function updateSystemStats() {
+        fetch('/system-stats')
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('cpu-usage').textContent = `${data.cpu_percent}%`;
+                document.getElementById('memory-usage').textContent = formatBytes(data.memory_used);
+                document.getElementById('memory-total').textContent = formatBytes(data.memory_total);
+                document.getElementById('disk-usage').textContent = formatBytes(data.disk_used);
+                document.getElementById('disk-total').textContent = formatBytes(data.disk_total);
+            });
+    }
+
+    // Atualiza os logs em tempo real
+    function updateLogs() {
+        const evtSource = new EventSource('/logs/stream');
+        const logsContainer = document.getElementById('logs-container');
+        
+        evtSource.onmessage = function(event) {
+            const log = JSON.parse(event.data);
+            const logEntry = document.createElement('div');
+            logEntry.className = 'p-2 border-b border-gray-200';
+            logEntry.innerHTML = `
+                <span class="text-gray-500">${new Date(log.timestamp).toLocaleString()}</span>
+                <span class="ml-2 ${log.level === 'ERROR' ? 'text-red-600' : 'text-gray-900'}">${log.message}</span>
+            `;
+            logsContainer.insertBefore(logEntry, logsContainer.firstChild);
+            
+            // Limita o número de logs exibidos
+            if (logsContainer.children.length > 100) {
+                logsContainer.removeChild(logsContainer.lastChild);
+            }
+        };
+    }
+
+    // Inicializa as atualizações
+    document.addEventListener('DOMContentLoaded', () => {
+        updateSystemStats();
+        setInterval(updateSystemStats, 5000);
+        updateLogs();
+    });
+</script>
+{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <!-- Estatísticas do Sistema -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div class="bg-white rounded-lg shadow p-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">CPU</h3>
+            <div class="flex items-center">
+                <svg class="h-8 w-8 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
+                </svg>
+                <div class="ml-4">
+                    <p class="text-sm text-gray-600">Uso</p>
+                    <p class="text-2xl font-semibold text-gray-900" id="cpu-usage">0%</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-lg shadow p-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">Memória</h3>
+            <div class="flex items-center">
+                <svg class="h-8 w-8 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                </svg>
+                <div class="ml-4">
+                    <p class="text-sm text-gray-600">Uso</p>
+                    <p class="text-2xl font-semibold text-gray-900">
+                        <span id="memory-usage">0 B</span> / <span id="memory-total">0 B</span>
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-lg shadow p-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">Disco</h3>
+            <div class="flex items-center">
+                <svg class="h-8 w-8 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                </svg>
+                <div class="ml-4">
+                    <p class="text-sm text-gray-600">Uso</p>
+                    <p class="text-2xl font-semibold text-gray-900">
+                        <span id="disk-usage">0 B</span> / <span id="disk-total">0 B</span>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chaves de API -->
+    <div class="bg-white rounded-lg shadow mb-8">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <h2 class="text-lg font-semibold text-gray-900">Chaves de API</h2>
+        </div>
+        <div class="p-6">
+            {% if api_keys %}
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead>
+                        <tr>
+                            <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Chave</th>
+                            <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                            <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Criada em</th>
+                            <th class="px-6 py-3 bg-gray-50 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        {% for key in api_keys %}
+                        <tr>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-900">{{ key.key[:8] }}...{{ key.key[-8:] }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full {{ 'bg-green-100 text-green-800' if key.is_active else 'bg-red-100 text-red-800' }}">
+                                    {{ 'Ativa' if key.is_active else 'Revogada' }}
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {{ key.created_at.strftime('%d/%m/%Y %H:%M') }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                {% if key.is_active %}
+                                <form action="/api-keys/{{ key.id }}/revoke" method="POST" class="inline">
+                                    <button type="submit" class="text-red-600 hover:text-red-900">Revogar</button>
+                                </form>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-gray-500 text-sm">Nenhuma chave de API encontrada.</p>
+            {% endif %}
+
+            {% if api_keys|length < 5 %}
+            <form action="/api-keys/generate" method="POST" class="mt-6">
+                <button type="submit" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                    <svg class="-ml-1 mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                    </svg>
+                    Gerar Nova Chave
+                </button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Logs do Sistema -->
+    <div class="bg-white rounded-lg shadow">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <h2 class="text-lg font-semibold text-gray-900">Logs do Sistema</h2>
+        </div>
+        <div class="p-6">
+            <div id="logs-container" class="h-96 overflow-y-auto bg-gray-50 rounded-lg">
+                {% for log in logs %}
+                <div class="p-2 border-b border-gray-200">
+                    <span class="text-gray-500">{{ log.timestamp.strftime('%d/%m/%Y %H:%M:%S') }}</span>
+                    <span class="ml-2 {{ 'text-red-600' if log.level == 'ERROR' else 'text-gray-900' }}">{{ log.message }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

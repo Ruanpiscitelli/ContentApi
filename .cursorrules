@@ -1,54 +1,41 @@
-You are an expert in Python, FastAPI, microservices architecture, and scalable AI deployments.
+You are an expert in Python, FastAPI, microservices architecture, and scalable AI deployments. This guide outlines a streamlined approach for building an AI content generation server that ensures high performance and scalability while minimizing initial complexity.
 
-## API Design and Architecture
-- Use **FastAPI** to build asynchronous, high-performance REST APIs.  
-- Structure the project using **microservices principles**, where each service (image, voice, video) is independent and scalable.  
-- Implement **dependency injection** using `Depends()` for database connections, authentication, and caching.  
-
-## Scalability and Performance Optimization
-- Ensure all services are **asynchronous** using `async def` and `await`.  
-- Optimize GPU usage with **torch.nn.DataParallel** for multi-GPU support.  
-- Deploy using **Kubernetes**, with Horizontal Pod Autoscaler (HPA) to scale services based on CPU/GPU utilization.  
-- Use **Redis** as a caching layer to store frequently accessed data (e.g., model templates, request responses).  
-- Prefer **message queues (RabbitMQ, Kafka)** for background tasks instead of synchronous processing.  
-- Implement **batch processing** where applicable to reduce redundant model executions.  
-
-## Fault Tolerance and Resilience
-- Implement **automatic retries** for failed API calls using exponential backoff.  
-- Use **circuit breakers** to prevent cascading failures in case of degraded dependencies.  
-- Deploy a **load balancer (NGINX,)** to distribute traffic efficiently across instances.  
-- Ensure **graceful shutdown** of services with FastAPI’s `lifespan` event handler.  
-- Implement **timeout handling** for long-running tasks (e.g., image generation, video processing).  
-
-## API Endpoints
-- Secure APIs with **token-based authentication (JWT, OAuth)**.  
-- Define **clear request/response schemas** using Pydantic models.  
-- Allow users to pass **custom templates via JSON** for model configurations.  
-
-## Kubernetes and Deployment
-- Use **Docker** for containerization and optimize images by minimizing unnecessary dependencies.  
-- Store models separately in a **shared volume (NFS, S3, or Persistent Volumes in Kubernetes)**.  
-- Ensure **zero-downtime deployments** using rolling updates.  
-- Configure **autoscaling policies** for handling traffic spikes.  
-
-## Caching and Response Optimization
-- Use **ETag and Cache-Control headers** for API responses to reduce redundant requests.  
-- Cache **frequent API responses** in Redis for lower latency.  
-- Optimize **JSON serialization** for large payloads using `orjson`.  
-
-## Database and Storage
-- Store metadata in a **minio** database.  
-- For AI models, use **TorchServe or TensorFlow Serving** instead of reloading models in memory.  
-- Keep **template configurations** in versioned JSON files for reproducibility.  
-
-## Error Handling and Logging
-- Implement **structured error messages** with FastAPI’s `HTTPException`.  
-- Use a **global exception handler** to catch and log critical errors.  
-- Validate all incoming requests using **Pydantic validators** to prevent malformed inputs.  
-
-## Testing and Validation
-- Write **unit tests** for API endpoints using `pytest`.  
-- Simulate real-world requests with **integration tests**.  
-- Use **mocking for external dependencies (database, AI models, message queues)**.  
-
-Follow these principles to ensure a robust, scalable, and high-performance AI content generation server.
+API Design and Architecture
+FastAPI: Build asynchronous, high-performance REST APIs.
+Lightweight Microservices Approach: Although the application is monolithic in deployment, structure your codebase so that each service (e.g., image, voice, video) is logically independent. This facilitates future decoupling if needed.
+Dependency Injection: Use FastAPI’s Depends() to manage database connections, authentication, and caching.
+Scalability and Performance Optimization (MVP)
+Asynchronous Processing: Ensure services are asynchronous using async def and await.
+Multi-GPU Support: Optimize GPU usage with torch.nn.DataParallel to fully leverage your 4 RTX 4090 GPUs.
+Caching: Use Redis to cache frequently accessed data such as model templates and API responses.
+Background Tasks: Utilize FastAPI’s built-in background tasks for non-critical operations, keeping the architecture simple by avoiding heavy message queue systems (like RabbitMQ or Kafka) at this stage.
+Fault Tolerance and Resilience
+Automatic Retries: Implement retries with exponential backoff for failed API calls.
+Timeouts & Graceful Shutdown: Set timeouts for long-running tasks and use FastAPI’s lifespan event handler to ensure smooth shutdowns.
+(Optional for MVP: Advanced mechanisms such as circuit breakers can be introduced later if needed.)
+API Endpoints
+Security: Secure your APIs using token-based authentication (JWT or OAuth).
+Schema Validation: Define clear request/response schemas with Pydantic.
+Custom Templates: Allow users to submit custom configuration templates via JSON.
+Deployment and Infrastructure (MVP)
+Single Docker Container: Containerize the entire application into one Docker container to simplify deployment and management.
+Simplified Deployment: Deploy the container on your vast.ai cloud server. The single-container approach minimizes orchestration complexity.
+Ngrok Integration: Use ngrok to expose your endpoints externally. This is particularly useful for development, testing, or when you need temporary external access without additional configuration.
+Model Storage: Store AI models on a suitable storage solution (local filesystem or cloud storage like S3) based on project needs.
+Leverage Cloud Resources: Utilize your server’s 4 RTX 4090 GPUs for intensive AI computations.
+Caching and Response Optimization
+HTTP Headers: Use ETag and Cache-Control headers to minimize redundant requests.
+Response Caching: Cache frequent API responses in Redis to improve latency.
+Efficient Serialization: Optimize JSON serialization using libraries like orjson for handling large payloads.
+Database and Storage
+Metadata Storage: Use a lightweight database (e.g., SQLite or PostgreSQL) for metadata.
+Model Serving: For the MVP, load models directly in memory. Consider integrating TorchServe or TensorFlow Serving as scaling needs increase.
+Versioned Templates: Maintain versioned JSON files for template configurations to ensure reproducibility.
+Error Handling and Logging
+Structured Errors: Use FastAPI’s HTTPException for consistent error responses.
+Global Exception Handling: Implement a global exception handler to capture and log critical errors.
+Robust Validation: Leverage Pydantic validators to ensure data integrity in incoming requests.
+Testing and Validation
+Unit Testing: Write unit tests for API endpoints using pytest.
+Integration Testing: Simulate real-world scenarios with integration tests.
+Mocking Dependencies: Use mocking for external dependencies (databases, AI models, etc.) to streamline testing.
