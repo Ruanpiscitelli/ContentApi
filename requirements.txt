@@ -4,17 +4,36 @@ uvicorn[standard]>=0.27.1
 pydantic>=2.6.1
 python-multipart>=0.0.7
 
+# WebSocket & Real-time
+websockets>=12.0
+python-socketio>=5.11.1
+aiohttp>=3.9.3
+asyncio-redis>=0.16.0
+starlette>=0.36.3
+sse-starlette>=1.8.2
+
 # AI/ML Core
-torch>=2.2.1
-torchvision>=0.17.1
-torchaudio>=2.2.1
 transformers>=4.38.2
 diffusers>=0.27.0
 accelerate>=0.28.0
 safetensors>=0.4.2
 vllm>=0.3.3
+flash-attn>=2.5.3
+xformers>=0.0.24
 
-# Processamento de Áudio
+# LLM & Language
+langchain>=0.1.4
+langchain_community>=0.0.13
+bitsandbytes>=0.42.0
+auto-gptq>=0.5.1
+exllama>=0.2.0
+
+# Image Processing
+controlnet-aux>=0.0.7
+timm>=0.9.12
+scikit-image>=0.22.0
+
+# Audio Processing
 fish-speech>=1.5.0
 fish-audio-python>=0.3.0
 soundfile>=0.12.1
@@ -22,128 +41,38 @@ pydub>=0.25.1
 resemblyzer>=0.1.1
 pyworld>=0.3.4
 
-# Processamento de Vídeo
+# Video Processing
 ffmpeg-python>=0.2.0
 moviepy>=1.0.3
 opencv-python>=4.9.0.80
 
-# Cache e Storage
+# Storage & Cache
 redis>=5.0.1
 minio>=7.2.3
-aioredis>=2.0.1
+cachetools>=5.3.2
+msgpack>=1.0.7
+lz4>=4.3.3
+etcd3>=0.12.0
 
-# Monitoramento
+# Monitoring & Logging
 python-json-logger>=2.0.7
 rich>=13.7.0
 
-# Utilitários
+# Database
+sqlalchemy>=2.0.27
+alembic>=1.13.1
+aiosqlite>=0.19.0
+
+# Security
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.4
+PyJWT>=2.8.0
+cryptography>=42.0.2
+
+# Utils & Optimization
 python-dotenv>=1.0.1
 httpx>=0.27.0
 tenacity>=8.2.3
 orjson>=3.9.12
-
-# Banco de Dados
-sqlalchemy>=2.0.27
-aiosqlite>=0.19.0
-alembic>=1.13.1
-
-# Otimizações GPU (apenas Linux/Windows)
-flash-attn>=2.5.3; platform_system != "Darwin"
-xformers>=0.0.24; platform_system != "Darwin"
-
-# Cache e Storage
-cachetools>=5.0.0
-msgpack>=1.0.3
-lz4>=4.0.0
-etcd3>=0.12.0
-
-# AI/ML Core
-transformers>=4.30.0
-diffusers>=0.25.0
-accelerate>=0.20.0
-vllm>=0.2.0
-langchain>=0.1.0
-langchain_community>=0.0.10
-bitsandbytes>=0.41.0
-auto-gptq>=0.5.0
-exllama>=0.1.0
-
-# Processamento de Imagem
-Pillow>=9.0.0
-opencv-python>=4.7.0
-numpy>=1.24.0
-scikit-image>=0.19.0
-controlnet-aux>=0.0.6
-timm>=0.6.0
-
-# Processamento de Áudio
-librosa>=0.9.0
-pyworld>=0.3.0
-resemblyzer>=0.1.1
-audioread>=3.0.0
-fish-audio-python>=0.2.0
-resampy>=0.4.2
-
-# Processamento de Vídeo
-moviepy>=1.0.3
-av>=10.0.0
-
-# Otimizações
-flash-attn>=2.0.0
-xformers>=0.0.20
-triton>=2.0.0
-onnxruntime-gpu>=1.15.0
-py3nvml>=0.2.7
-numba>=0.58.0
-cuda-python>=12.0
-
-# Monitoramento e Logging
-prometheus-client>=0.14.0
-python-json-logger>=2.0.0
-rich>=10.0.0
-loguru>=0.7.2
-opentelemetry-api>=1.20.0
-opentelemetry-sdk>=1.20.0
-opentelemetry-instrumentation-fastapi>=0.41b0
-grafana-api>=1.0.3
-
-# HTTP e Networking
-aiohttp>=3.8.0
-requests>=2.31.0
-websockets>=12.0
-urllib3>=2.0.0
-asyncio-extras>=1.3.2
-
-# Utilitários
-python-dotenv>=1.0.0
-tenacity>=8.0.0
-psutil>=5.9.0
-watchdog>=3.0.0
-PyYAML>=6.0.1
-jinja2>=3.1.2
-python-magic>=0.4.27
-
-# Desenvolvimento e Testes
-pytest>=7.4.3
-pytest-asyncio>=0.21.1
-pytest-cov>=4.1.0
-black>=23.11.0
-flake8>=6.1.0
-isort>=5.12.0
-mypy>=1.7.1
-pytest-benchmark>=4.0.0
-pytest-xdist>=3.3.1
-
-# Documentação
-mkdocs>=1.5.3
-mkdocs-material>=9.4.14
-mkdocstrings>=0.24.0
-sphinx>=7.1.2
-pdoc3>=0.10.0
-
-# Segurança
-python-jose[cryptography]>=3.3.0
-passlib[bcrypt]>=1.7.4
-python-multipart>=0.0.6
-PyJWT>=2.8.0
-cryptography>=41.0.0
+psutil>=5.9.8
+watchdog>=4.0.0
