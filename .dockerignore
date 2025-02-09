@@ -65,6 +65,7 @@ Dockerfile*
 !services/*/requirements.txt
 !services/*/app.py
 !services/*/config.py
+!services/*/entrypoint.sh
 !shared/**
 
 env

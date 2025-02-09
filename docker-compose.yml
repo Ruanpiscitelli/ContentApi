@@ -129,7 +129,7 @@ services:
       - "8004:9000"
     volumes:
       - ./shared:/app/shared:ro
-      - ./models:/app/models:ro
+      - models_data:/app/models
     deploy:
       resources:
         reservations:
@@ -146,6 +146,7 @@ services:
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
       - CUDA_VISIBLE_DEVICES=all
+      - HUGGING_FACE_HUB_TOKEN=${HUGGING_FACE_HUB_TOKEN}
     networks:
       - ai-network
 
@@ -177,6 +178,8 @@ services:
 
 volumes:
   redis_data:
+    driver: local
+  models_data:
     driver: local
 
 networks:
