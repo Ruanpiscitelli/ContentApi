@@ -1,19 +1,7 @@
 version: '3.8'
 
-x-common-deploy: &common-deploy
-  deploy:
-    update_config:
-      parallelism: 1
-      delay: 10s
-    restart_policy:
-      condition: on-failure
-      max_attempts: 3
-    resources:
-      limits:
-        cpus: '4'
-        memory: 16G
-
 x-common-settings: &common-settings
+  restart: unless-stopped
   logging:
     driver: "json-file"
     options:
@@ -30,7 +18,6 @@ x-common-settings: &common-settings
     - /tmp:exec,mode=777
   cap_drop:
     - ALL
-  restart: unless-stopped
   depends_on:
     redis:
       condition: service_healthy
@@ -48,7 +35,6 @@ services:
     volumes:
       - ./models:/app/models:ro
       - ./shared:/app/shared:ro
-    <<: *common-deploy
     <<: *common-settings
     environment:
       - NVIDIA_VISIBLE_DEVICES=0
@@ -66,6 +52,9 @@ services:
       start_period: 180s
     deploy:
       resources:
+        limits:
+          cpus: '4'
+          memory: 16G
         reservations:
           devices:
             - driver: nvidia
@@ -82,7 +71,6 @@ services:
     volumes:
       - ./models:/app/models:ro
       - ./shared:/app/shared:ro
-    <<: *common-deploy
     <<: *common-settings
     environment:
       - NVIDIA_VISIBLE_DEVICES=1
@@ -117,7 +105,6 @@ services:
       - ./models:/app/models:ro
       - ./shared:/app/shared:ro
       - /tmp:/tmp
-    <<: *common-deploy
     <<: *common-settings
     environment:
       - NVIDIA_VISIBLE_DEVICES=2
