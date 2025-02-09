@@ -1,22 +1,78 @@
-.git
-.gitignore
-__pycache__
+# Diretórios de modelos e cache
+models/
+.cache/
+**/cache/
+**/models/
+**/__pycache__/
+
+# Arquivos temporários
 *.pyc
 *.pyo
 *.pyd
 .Python
+*.so
+
+# Ambientes virtuais
+env/
+venv/
+.env/
+.venv/
+
+# Logs e dados
+logs/
+*.log
+data/
+
+# Git e outros
+.git/
+.gitignore
+.github/
+.pytest_cache/
+.coverage
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Arquivos grandes e backups
+*.tar
+*.gz
+*.zip
+*.rar
+*.7z
+*.model
+*.pt
+*.pth
+*.onnx
+*.safetensors
+*.bin
+
+# Documentação
+docs/
+*.md
+LICENSE
+
+# Docker
+.docker/
+docker-compose*.yml
+Dockerfile*
+
+# Exceto arquivos necessários
+!requirements.txt
+!download_models.py
+!services/*/requirements.txt
+!services/*/app.py
+!services/*/config.py
+!shared/**
+
 env
 pip-log.txt
 pip-delete-this-directory.txt
 .tox
-.coverage
 .coverage.*
-.cache
 nosetests.xml
 coverage.xml
 *.cover
-*.log
-.pytest_cache
-.env
-.venv
 .DS_Store 
