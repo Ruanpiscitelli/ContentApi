@@ -20,4 +20,8 @@ __pycache__/
 *.pyc
 
 # Manter arquivos essenciais
-!models/.gitkeep 
+!models/.gitkeep
+
+# Ambiente
+.env
+.env.* 

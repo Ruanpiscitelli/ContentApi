@@ -63,6 +63,7 @@ services:
       - CUDA_HOME=/usr/local/cuda
       - TORCH_CUDA_ARCH_LIST=8.6
       - XFORMERS_ENABLE_FLASH_ATTENTION=true
+      - SKIP_MODEL_DOWNLOAD=true
     ports:
       - "8001:8000"
     healthcheck:
@@ -87,6 +88,7 @@ services:
       - CUDA_HOME=/usr/local/cuda
       - TORCH_CUDA_ARCH_LIST=8.6
       - XFORMERS_ENABLE_FLASH_ATTENTION=true
+      - SKIP_MODEL_DOWNLOAD=true
     ports:
       - "8002:8000"
     healthcheck:
@@ -112,6 +114,7 @@ services:
       - TORCH_CUDA_ARCH_LIST=8.6
       - VLLM_USE_CUDA=1
       - XFORMERS_ENABLE_FLASH_ATTENTION=true
+      - SKIP_MODEL_DOWNLOAD=true
     ports:
       - "8003:8000"
     healthcheck:
@@ -128,8 +131,8 @@ services:
     ports:
       - "8004:9000"
     volumes:
+      - ./models:/app/models:ro
       - ./shared:/app/shared:ro
-      - models_data:/app/models
     deploy:
       resources:
         reservations:
@@ -146,7 +149,7 @@ services:
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
       - CUDA_VISIBLE_DEVICES=all
-      - HUGGING_FACE_HUB_TOKEN=${HUGGING_FACE_HUB_TOKEN}
+      - SKIP_MODEL_DOWNLOAD=true
     networks:
       - ai-network
 
@@ -178,8 +181,6 @@ services:
 
 volumes:
   redis_data:
-    driver: local
-  models_data:
     driver: local
 
 networks:
