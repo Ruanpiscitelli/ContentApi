@@ -41,23 +41,29 @@ ENV LD_LIBRARY_PATH=${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
 
-# Otimizações CUDA
-ENV CUDA_MODULE_LOADING=LAZY
-ENV TORCH_ALLOW_TF32=1
-ENV NVIDIA_VISIBLE_DEVICES=all
-ENV CUDA_VISIBLE_DEVICES=all
-ENV TORCH_CUDA_ARCH_LIST="7.0;7.5;8.0;8.6;8.9;9.0+PTX"
-
-# Instalar apenas o necessário para runtime
-RUN apt-get update && apt-get install -y \
+# Adicionar repositório NVIDIA e instalar dependências CUDA
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    gnupg2 \
+    ca-certificates \
+    && curl -fsSL https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.1-1_all.deb -o cuda-keyring.deb \
+    && dpkg -i cuda-keyring.deb \
+    && apt-get update && apt-get install -y --no-install-recommends \
     python3.10 \
     python3-pip \
-    curl \
     ffmpeg \
     libsndfile1 \
     libgomp1 \
+    cuda-cudart-12-1 \
+    cuda-nvrtc-12-1 \
+    cuda-nvtx-12-1 \
+    libnvinfer8 \
+    libnvonnxparsers8 \
+    libnvparsers8 \
+    libnvinfer-plugin8 \
     && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && rm cuda-keyring.deb
 
 WORKDIR /app
 
@@ -74,6 +80,13 @@ RUN mkdir -p /app/models/cache /app/models/hub /app/data /app/logs && \
 # Configurações HuggingFace
 ENV TRANSFORMERS_CACHE=/app/models/cache
 ENV HF_HOME=/app/models/hub
+
+# Otimizações CUDA
+ENV CUDA_MODULE_LOADING=LAZY
+ENV TORCH_ALLOW_TF32=1
+ENV NVIDIA_VISIBLE_DEVICES=all
+ENV CUDA_VISIBLE_DEVICES=all
+ENV TORCH_CUDA_ARCH_LIST="7.0;7.5;8.0;8.6;8.9;9.0+PTX"
 
 # Healthcheck mais robusto para cloud
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
