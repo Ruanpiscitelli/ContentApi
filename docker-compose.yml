@@ -191,19 +191,44 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  networks:
-    default:
-      driver: bridge
-      ipam:
-        driver: default
-        config:
-          - subnet: 172.28.0.0/24
-    ai-network:
-      driver: bridge
-      ipam:
-        driver: default
-        config:
-          - subnet: 172.29.0.0/24
+  dashboard:
+    <<: *common-settings
+    build:
+      context: .
+      dockerfile: services/dashboard/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - API_HOST=0.0.0.0
+      - API_PORT=8000
+    depends_on:
+      - video-generator
+      - image-generator
+      - text-generation
+      - voice-generator
+      - video-editor
+
+  models:
+    build:
+      context: .
+      dockerfile: Dockerfile.models
+    volumes:
+      - ./models:/app/models
+    command: ["bash", "download_models.sh"]
+
+networks:
+  default:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.28.0.0/24
+  ai-network:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.29.0.0/24
 
 volumes:
   redis_data: 
