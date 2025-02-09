@@ -6,7 +6,7 @@ x-common-deploy: &common-deploy
       reservations:
         devices:
           - driver: nvidia
-            count: all
+            device_ids: ['0,1,2,3']
             capabilities: [gpu, utility, compute]
     update_config:
       parallelism: 1
@@ -76,7 +76,7 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              count: 1
+              device_ids: ['0']
               capabilities: [gpu]
 
   image-generator:
@@ -102,6 +102,13 @@ services:
       timeout: 10s
       retries: 3
       start_period: 60s
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ['1']
+              capabilities: [gpu]
 
   text-generation:
     build:
@@ -127,6 +134,13 @@ services:
       timeout: 10s
       retries: 3
       start_period: 60s
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ['2']
+              capabilities: [gpu]
 
   voice-generator:
     build:
@@ -142,7 +156,7 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              count: 1
+              device_ids: ['3']
               capabilities: [gpu]
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/health"]
@@ -180,8 +194,7 @@ services:
       - no-new-privileges:true
     read_only: true
     tmpfs:
-      - /tmp
-      - /data
+      - /tmp:exec
     cap_drop:
       - ALL
 
