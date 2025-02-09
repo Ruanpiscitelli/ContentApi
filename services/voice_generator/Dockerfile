@@ -52,7 +52,6 @@ WORKDIR /app
 COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
 
 # Copiar arquivos do serviço
-COPY download_models.py .
 COPY services/voice_generator ./services/voice_generator
 COPY shared ./shared
 

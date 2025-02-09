@@ -4,7 +4,7 @@ set -e
 # Verifica se os modelos necessários existem
 check_models() {
     required_models=(
-        "/app/models/voz/fish-speech-1.4.3"
+        "/app/models/video/stable-video-diffusion-img2vid-xt"
     )
 
     for model in "${required_models[@]}"; do
@@ -21,5 +21,5 @@ if [ "$SKIP_MODEL_DOWNLOAD" != "true" ]; then
     check_models
 fi
 
-# Iniciar a aplicação
-exec uvicorn services.voice_generator.app:app --host 0.0.0.0 --port 9000 
+# Inicia a aplicação
+exec uvicorn services.video_generator.app:app --host 0.0.0.0 --port 8000 

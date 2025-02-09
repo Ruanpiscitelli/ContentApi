@@ -63,7 +63,6 @@ services:
       - CUDA_HOME=/usr/local/cuda
       - TORCH_CUDA_ARCH_LIST=8.6
       - XFORMERS_ENABLE_FLASH_ATTENTION=true
-      - SKIP_MODEL_DOWNLOAD=true
     ports:
       - "8001:8000"
     healthcheck:
@@ -72,6 +71,13 @@ services:
       timeout: 10s
       retries: 3
       start_period: 60s
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
 
   image-generator:
     build:
@@ -88,7 +94,6 @@ services:
       - CUDA_HOME=/usr/local/cuda
       - TORCH_CUDA_ARCH_LIST=8.6
       - XFORMERS_ENABLE_FLASH_ATTENTION=true
-      - SKIP_MODEL_DOWNLOAD=true
     ports:
       - "8002:8000"
     healthcheck:
@@ -114,7 +119,6 @@ services:
       - TORCH_CUDA_ARCH_LIST=8.6
       - VLLM_USE_CUDA=1
       - XFORMERS_ENABLE_FLASH_ATTENTION=true
-      - SKIP_MODEL_DOWNLOAD=true
     ports:
       - "8003:8000"
     healthcheck:
@@ -149,7 +153,9 @@ services:
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
       - CUDA_VISIBLE_DEVICES=all
-      - SKIP_MODEL_DOWNLOAD=true
+      - CUDA_HOME=/usr/local/cuda
+      - TORCH_CUDA_ARCH_LIST=8.6
+      - XFORMERS_ENABLE_FLASH_ATTENTION=true
     networks:
       - ai-network
 

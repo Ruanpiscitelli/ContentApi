@@ -31,11 +31,11 @@ WORKDIR /app
 COPY --from=builder /opt/conda/lib/python3.10/site-packages /opt/conda/lib/python3.10/site-packages
 
 # Copiar arquivos do serviço
-COPY download_models.py .
 COPY services/video_generator ./services/video_generator
 COPY shared ./shared
 
-RUN python3 download_models.py
+# Criar diretório de modelos
+RUN mkdir -p /app/models
 
 RUN conda install -y -c conda-forge \
     transformers \
@@ -44,5 +44,8 @@ RUN conda install -y -c conda-forge \
     safetensors \
     xformers
 
-EXPOSE 8000
-CMD ["uvicorn", "services.video_generator.app:app", "--host", "0.0.0.0", "--port", "8000"]
+# Script de inicialização
+COPY services/video_generator/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+ENTRYPOINT ["/entrypoint.sh"]
