@@ -4,8 +4,7 @@ set -e
 # Verifica se os modelos necessários existem
 check_models() {
     required_models=(
-        "/app/models/texto/MiniCPM-o-2_6"
-        "/app/models/texto/DeepSeek-R1-Distill-Qwen-32B-abliterated"
+        "/app/models/voz/fish-speech-1.4.3"
     )
 
     for model in "${required_models[@]}"; do
@@ -22,5 +21,5 @@ if [ "$SKIP_MODEL_DOWNLOAD" != "true" ]; then
     check_models
 fi
 
-# Inicia a aplicação
-exec uvicorn services.text_generation.app:app --host 0.0.0.0 --port 9000 
+# Iniciar a aplicação
+exec uvicorn services.voice_generator.app:app --host 0.0.0.0 --port 9000 

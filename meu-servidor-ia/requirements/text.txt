@@ -1,0 +1,14 @@
+# Text Generation Service Dependencies
+-r base.txt
+
+# LLM and Text Generation
+transformers>=4.35.2
+tokenizers>=0.15.0
+sentencepiece>=0.1.99
+vllm>=0.2.5
+accelerate>=0.24.1
+
+# Text Processing
+nltk>=3.8.1
+spacy>=3.7.2
+tiktoken>=0.5.1 

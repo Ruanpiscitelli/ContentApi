@@ -1,11 +1,32 @@
 """
 Serviço de geração de voz com suporte a múltiplos backends.
 """
+import os
+import time
 import logging
+import asyncio
+from typing import Optional, Dict, Any
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.timeout import TimeoutMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
+
+# Importa módulos compartilhados
+from shared.config_base import BaseServiceConfig
+from shared.monitoring import ServiceMetrics
+from shared.utils import (
+    save_upload_file,
+    create_temp_file,
+    run_with_timeout,
+    RateLimiter
+)
+from shared.cache import CacheManager
+from shared.validation import (
+    ResourceValidationError,
+    GPUResourceValidator,
+    ModelLoadValidator
+)
 
 from .routers import voice
 from .config import API_CONFIG
@@ -29,6 +50,12 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"]
+)
+
+# Adiciona middleware de timeout
+app.add_middleware(
+    TimeoutMiddleware,
+    timeout=300  # 5 minutos
 )
 
 # Handlers de exceção globais
@@ -56,7 +83,7 @@ async def general_exception_handler(request: Request, exc: Exception):
     """Handler para exceções não tratadas."""
     logger.error(f"Erro não tratado: {exc}", exc_info=True)
     return JSONResponse(
-            status_code=500,
+        status_code=500,
         content={"detail": "Erro interno do servidor"}
     )
 
@@ -80,7 +107,7 @@ async def shutdown():
 @app.get("/health")
 async def health_check():
     """Endpoint de verificação de saúde."""
-        return {
-            "status": "healthy",
+    return {
+        "status": "healthy",
         "version": "1.0.0"
     }

@@ -4,7 +4,7 @@ set -e
 # Verifica se os modelos necessários existem
 check_models() {
     required_models=(
-        "/app/models/video/stable-video-diffusion-img2vid-xt"
+        "/app/models/video/FastHunyuan"
     )
 
     for model in "${required_models[@]}"; do
@@ -22,4 +22,4 @@ if [ "$SKIP_MODEL_DOWNLOAD" != "true" ]; then
 fi
 
 # Inicia a aplicação
-exec uvicorn services.video_generator.app:app --host 0.0.0.0 --port 8000 
+exec uvicorn meu-servidor-ia.services.video_editor.app:app --host 0.0.0.0 --port 8000 

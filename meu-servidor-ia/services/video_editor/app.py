@@ -25,7 +25,7 @@ from pydantic import BaseModel, Field
 from minio import Minio
 from minio.error import S3Error
 
-from .config import MINIO_CONFIG, API_CONFIG
+from .config import settings
 from .security import verify_bearer_token
 from .models import Operation, VideoRequest, VideoEditRequest, SilenceCutRequest
 from .pipeline import VideoPipeline
@@ -47,14 +47,14 @@ app = FastAPI(
 # Adiciona CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=API_CONFIG["cors"]["origins"],
+    allow_origins=settings["cors"]["origins"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"]
 )
 
 # Cliente MinIO
-minio_client = Minio(**MINIO_CONFIG)
+minio_client = Minio(**settings["minio"])
 
 # Pipeline de processamento
 pipeline = VideoPipeline()

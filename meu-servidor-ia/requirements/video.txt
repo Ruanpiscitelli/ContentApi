@@ -1,0 +1,20 @@
+# Video Services Dependencies (Generator and Editor)
+-r base.txt
+
+# Video Processing
+opencv-python-headless>=4.8.1.78
+moviepy>=1.0.3
+decord>=0.6.0
+av>=10.0.0
+imageio>=2.31.6
+imageio-ffmpeg>=0.4.9
+
+# ML Models
+transformers>=4.35.2
+diffusers>=0.24.0
+accelerate>=0.24.1
+xformers>=0.0.22.post7
+
+# Video Editing
+json2video>=1.0.0
+ffmpeg-python>=0.2.0 
