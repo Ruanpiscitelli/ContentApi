@@ -18,7 +18,6 @@ timm>=0.9.12
 scikit-image>=0.22.0
 
 # Audio Processing
-git+https://github.com/fishaudio/fish-speech.git@v1.5.0
 fish-audio-python>=0.3.0
 soundfile>=0.12.1
 pydub>=0.25.1
