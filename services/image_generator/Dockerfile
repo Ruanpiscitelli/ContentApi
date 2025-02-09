@@ -10,9 +10,17 @@ RUN apt-get update && apt-get install -y \
     python3-pip \
     git \
     git-lfs \
+    build-essential \
+    python3-dev \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
+
+# Instalar dependências básicas primeiro
+RUN pip3 install --no-cache-dir \
+    packaging \
+    setuptools \
+    wheel
 
 # Copiar arquivos necessários
 COPY requirements.txt .
