@@ -1,8 +1,8 @@
 # Web Framework
-fastapi>=0.109.2
-uvicorn[standard]>=0.27.1
+fastapi>=0.104.1
+uvicorn>=0.24.0
 pydantic>=2.6.1
-python-multipart>=0.0.7
+python-multipart>=0.0.6
 
 # WebSocket & Real-time
 websockets>=12.0
@@ -13,9 +13,9 @@ starlette>=0.36.3
 sse-starlette>=1.8.2
 
 # AI/ML Core
-transformers>=4.38.2
-diffusers>=0.27.0
-accelerate>=0.28.0
+transformers>=4.35.2
+diffusers>=0.24.0
+accelerate>=0.24.1
 safetensors>=0.4.2
 vllm>=0.3.3
 flash-attn>=2.5.3
@@ -76,3 +76,6 @@ tenacity>=8.2.3
 orjson>=3.9.12
 psutil>=5.9.8
 watchdog>=4.0.0
+
+# Added from the code block
+requests>=2.31.0
