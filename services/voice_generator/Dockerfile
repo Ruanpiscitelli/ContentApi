@@ -33,3 +33,17 @@ EXPOSE 8000
 
 # Comando para iniciar o serviço
 CMD ["uvicorn", "services.voice_generator.app:app", "--host", "0.0.0.0", "--port", "8000"]
+
+# Build stage
+FROM pytorch/pytorch:2.2.1-cuda12.1-cudnn8-devel AS builder
+
+# Instalar git para clonar repositórios
+RUN apt-get update && apt-get install -y \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /build
+COPY services/voice_generator/requirements.txt .
+
+# Instalar com flags específicas para CUDA
+RUN TORCH_CUDA_ARCH_LIST="8.6" pip install --no-cache-dir -r requirements.txt

@@ -1,5 +1,3 @@
-
-
 x-common-deploy: &common-deploy
   deploy:
     resources:
@@ -106,6 +104,8 @@ services:
     build:
       context: .
       dockerfile: services/voice_generator/Dockerfile
+    args:
+      - REQUIREMENTS_FILE=services/voice_generator/requirements.txt
     volumes:
       - ./models:/app/models:ro
       - ./shared:/app/shared:ro
