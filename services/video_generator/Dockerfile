@@ -2,12 +2,11 @@
 FROM nvidia/cuda:12.1.0-devel-ubuntu22.04 AS builder
 
 ENV DEBIAN_FRONTEND=noninteractive
-ENV PYTHON_VERSION=3.10
 
 # Instalar Python e dependências de build
 RUN apt-get update && apt-get install -y \
-    python${PYTHON_VERSION} \
-    python${PYTHON_VERSION}-dev \
+    python3.10 \
+    python3.10-dev \
     python3-pip \
     git \
     git-lfs \
@@ -37,7 +36,7 @@ RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
 # Instalar dependências do sistema
 RUN apt-get update && apt-get install -y \
-    python${PYTHON_VERSION} \
+    python3.10 \
     python3-pip \
     git \
     git-lfs \
