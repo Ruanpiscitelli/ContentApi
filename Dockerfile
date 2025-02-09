@@ -9,7 +9,7 @@ ENV CUDA_HOME=/usr/local/cuda
 ENV PATH=${CUDA_HOME}/bin:${PATH}
 ENV LD_LIBRARY_PATH=${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}
 
-# Instalar dependências essenciais
+# Instalar dependências essenciais e configurar repositório NVIDIA
 RUN apt-get update && apt-get install -y \
     python3.10 \
     python3.10-dev \
@@ -18,7 +18,15 @@ RUN apt-get update && apt-get install -y \
     build-essential \
     curl \
     ninja-build \
-    && rm -rf /var/lib/apt/lists/*
+    gnupg2 \
+    ca-certificates \
+    && curl -fsSL https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-ubuntu2204.pin -o /etc/apt/preferences.d/cuda-repository-pin-600 \
+    && curl -fsSL https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.1-1_all.deb -o cuda-keyring.deb \
+    && dpkg -i cuda-keyring.deb \
+    && apt-get update \
+    && apt-get install -y cuda-toolkit-12-1 \
+    && rm -rf /var/lib/apt/lists/* \
+    && rm cuda-keyring.deb
 
 WORKDIR /build
 
@@ -41,26 +49,25 @@ ENV LD_LIBRARY_PATH=${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
 
-# Adicionar repositório NVIDIA e instalar dependências CUDA
+# Instalar runtime dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
-    gnupg2 \
-    ca-certificates \
-    && curl -fsSL https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.1-1_all.deb -o cuda-keyring.deb \
-    && dpkg -i cuda-keyring.deb \
-    && apt-get update && apt-get install -y --no-install-recommends \
     python3.10 \
     python3-pip \
+    curl \
     ffmpeg \
     libsndfile1 \
     libgomp1 \
-    cuda-cudart-12-1 \
-    cuda-nvrtc-12-1 \
-    cuda-nvtx-12-1 \
-    libnvinfer8 \
-    libnvonnxparsers8 \
-    libnvparsers8 \
-    libnvinfer-plugin8 \
+    && curl -fsSL https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.1-1_all.deb -o cuda-keyring.deb \
+    && dpkg -i cuda-keyring.deb \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends \
+        cuda-cudart-12-1 \
+        cuda-nvrtc-12-1 \
+        cuda-nvtx-12-1 \
+        libnvinfer8 \
+        libnvonnxparsers8 \
+        libnvparsers8 \
+        libnvinfer-plugin8 \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* \
     && rm cuda-keyring.deb
