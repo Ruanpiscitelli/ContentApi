@@ -17,7 +17,7 @@ WORKDIR /app
 # Copiar arquivos necessários
 COPY requirements.txt .
 COPY download_models.py .
-COPY services/$service ./services/$service
+COPY services/video_generator ./services/video_generator
 COPY shared ./shared
 
 # Instalar dependências Python
@@ -30,4 +30,4 @@ RUN python3 download_models.py
 EXPOSE 8000
 
 # Comando para iniciar o serviço
-CMD ["uvicorn", "services.$service.app:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "services.video_generator.app:app", "--host", "0.0.0.0", "--port", "8000"]
