@@ -18,7 +18,6 @@ diffusers>=0.24.0
 accelerate>=0.24.1
 safetensors>=0.4.2
 vllm>=0.3.3
-flash-attn>=2.0.4
 xformers>=0.0.24
 
 # LLM & Language
