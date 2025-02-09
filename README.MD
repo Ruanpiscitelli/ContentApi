@@ -281,3 +281,16 @@ docker builder prune -f
 
 # Reconstruir
 docker-compose build --no-cache
+
+# Limpar tudo
+docker-compose down -v
+docker system prune -af --volumes
+
+# Baixar modelos atualizados
+bash download_models.sh
+
+# Verificar estrutura
+ls -la models/*
+
+# Reconstruir e iniciar
+docker-compose up --build

@@ -191,6 +191,31 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  dashboard:
+    <<: *common-settings
+    build:
+      context: .
+      dockerfile: services/dashboard/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - API_HOST=0.0.0.0
+      - API_PORT=8000
+    depends_on:
+      - video-generator
+      - image-generator
+      - text-generation
+      - voice-generator
+      - video-editor
+
+  models:
+    build:
+      context: .
+      dockerfile: Dockerfile.models
+    volumes:
+      - ./models:/app/models
+    command: ["bash", "download_models.sh"]
+
 volumes:
   redis_data:
 

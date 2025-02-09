@@ -79,12 +79,17 @@ download_modelscope() {
     
     echo "Baixando modelo do ModelScope: $model para $target..."
     
-    # Instala modelscope_cli se necessário
-    if ! command -v modelscope-cli &> /dev/null; then
-        pip install modelscope_cli
-    fi
+    mkdir -p "$target"
     
-    modelscope-cli download --model-name $model --save-dir $target
+    # Download direto dos arquivos necessários
+    curl -L "https://modelscope.cn/api/v1/models/FastVideo/FastHunyuan-diffusers/repo?Revision=master&FilePath=model_index.json" \
+         -o "$target/model_index.json"
+    
+    curl -L "https://modelscope.cn/api/v1/models/FastVideo/FastHunyuan-diffusers/repo?Revision=master&FilePath=pytorch_model.bin" \
+         -o "$target/pytorch_model.bin"
+    
+    curl -L "https://modelscope.cn/api/v1/models/FastVideo/FastHunyuan-diffusers/repo?Revision=master&FilePath=config.json" \
+         -o "$target/config.json"
 }
 
 # Função para baixar do CivitAI
