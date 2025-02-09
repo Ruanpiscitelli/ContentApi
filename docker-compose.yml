@@ -151,6 +151,7 @@ services:
     environment:
       - NVIDIA_VISIBLE_DEVICES=4
       - CUDA_VISIBLE_DEVICES=4
+      - SKIP_MODEL_DOWNLOAD=true
     ports:
       - "8005:8000"
     deploy:
@@ -198,4 +199,21 @@ networks:
     ipam:
       driver: default
       config:
-        - subnet: 172.29.0.0/24 
+        - subnet: 172.29.0.0/24
+
+dashboard:
+  <<: *common-settings
+  build:
+    context: .
+    dockerfile: services/dashboard/Dockerfile
+  ports:
+    - "8000:8000"
+  environment:
+    - API_HOST=0.0.0.0
+    - API_PORT=8000
+  depends_on:
+    - video-generator
+    - image-generator
+    - text-generation
+    - voice-generator
+    - video-editor 

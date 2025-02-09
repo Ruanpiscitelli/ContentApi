@@ -20,6 +20,7 @@ RUN pip3 install --no-cache-dir -r requirements.txt
 
 COPY services/image_generator ./services/image_generator
 COPY shared ./shared
+WORKDIR /app/services/image_generator
 
 # Criar diretório de modelos
 RUN mkdir -p /app/models

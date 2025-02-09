@@ -64,7 +64,7 @@ declare -a models=(
     "texto/DeepSeek-R1-Distill-Qwen-32B-abliterated:huihui-ai/DeepSeek-R1-Distill-Qwen-32B-abliterated"
     "imagem/animagine-xl-4.0:cagliostrolab/animagine-xl-4.0"
     "imagem/ultimate-realistic-mix-v2-sdxl:John6666/ultimate-realistic-mix-v2-sdxl"
-    "voz/fish-speech-1.5:fishaudio/fish-speech-1.5"
+    "voz/fish-speech-1.5:fish-speech-1.5"
     "video/FastHunyuan:FastVideo/FastHunyuan-diffusers"
 )
 
@@ -101,6 +101,28 @@ download_civitai() {
     curl -L "https://civitai.com/api/download/models/$model_id" -o "$target/model.safetensors"
 }
 
+# Função para baixar modelo Fish Speech
+download_fish_speech() {
+    local target=$1
+    
+    if check_model "$target"; then
+        return 0
+    fi
+    
+    echo "Baixando Fish Speech 1.5..."
+    mkdir -p "$target"
+    
+    # Download dos três arquivos necessários
+    curl -L "https://huggingface.co/fishaudio/fish-speech-1.5/resolve/main/model.pth?download=true" \
+         -o "$target/model.pth"
+    
+    curl -L "https://huggingface.co/fishaudio/fish-speech-1.5/resolve/main/firefly-gan-vq-fsq-8x1024-21hz-generator.pth?download=true" \
+         -o "$target/firefly-gan-vq-fsq-8x1024-21hz-generator.pth"
+    
+    curl -L "https://huggingface.co/fishaudio/fish-speech-1.5/resolve/main/tokenizer.tiktoken?download=true" \
+         -o "$target/tokenizer.tiktoken"
+}
+
 # Download dos modelos
 for model in "${models[@]}"; do
     IFS=':' read -r path repo <<< "$model"
@@ -110,6 +132,9 @@ for model in "${models[@]}"; do
             ;;
         "John6666/ultimate-realistic-mix-v2-sdxl")
             download_civitai "266874" "models/$path"
+            ;;
+        "fish-speech-1.5")
+            download_fish_speech "models/$path"
             ;;
         *)
             download_model "$repo" "models/$path"
