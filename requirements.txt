@@ -12,21 +12,6 @@ asyncio-redis>=0.16.0
 starlette>=0.36.3
 sse-starlette>=1.8.2
 
-# AI/ML Core
-transformers==4.48.3
-diffusers>=0.24.0
-accelerate>=0.24.1
-safetensors>=0.4.2
-vllm>=0.3.3
-xformers>=0.0.24
-
-# LLM & Language
-langchain>=0.1.4
-langchain_community>=0.0.13
-bitsandbytes>=0.42.0
-auto-gptq>=0.5.1
-exllama>=0.2.0
-
 # Image Processing
 controlnet-aux>=0.0.7
 timm>=0.9.12

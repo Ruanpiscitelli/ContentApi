@@ -1,4 +1,12 @@
-FROM pytorch/pytorch:2.2.1-cuda12.1-cudnn8-devel
+# Build stage
+FROM pytorch/pytorch:2.2.1-cuda12.1-cudnn8-devel AS builder
+
+WORKDIR /build
+COPY services/video_generator/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Runtime stage
+FROM pytorch/pytorch:2.2.1-cuda12.1-cudnn8-runtime
 
 ENV TZ=America/Sao_Paulo
 ENV CUDA_HOME=/usr/local/cuda
@@ -19,17 +27,22 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-# Instalar dependências base primeiro
-COPY requirements.txt .
-RUN pip3 install --no-cache-dir packaging setuptools wheel && \
-    pip3 install --no-cache-dir torch==2.2.1 && \
-    TORCH_CUDA_ARCH_LIST="8.6" pip3 install --no-cache-dir -r requirements.txt
+# Copiar dependências do build stage
+COPY --from=builder /opt/conda/lib/python3.10/site-packages /opt/conda/lib/python3.10/site-packages
 
+# Copiar arquivos do serviço
 COPY download_models.py .
 COPY services/video_generator ./services/video_generator
 COPY shared ./shared
 
 RUN python3 download_models.py
+
+RUN conda install -y -c conda-forge \
+    transformers \
+    diffusers \
+    accelerate \
+    safetensors \
+    xformers
 
 EXPOSE 8000
 CMD ["uvicorn", "services.video_generator.app:app", "--host", "0.0.0.0", "--port", "8000"]

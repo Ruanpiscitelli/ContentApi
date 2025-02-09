@@ -19,6 +19,8 @@ services:
       - NVIDIA_VISIBLE_DEVICES=all
       - CUDA_VISIBLE_DEVICES=all
       - CUDA_HOME=/usr/local/cuda
+      - TORCH_CUDA_ARCH_LIST=8.6
+      - XFORMERS_ENABLE_FLASH_ATTENTION=true
     ports:
       - "8001:8000"
     healthcheck:
@@ -44,6 +46,9 @@ services:
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
       - CUDA_VISIBLE_DEVICES=all
+      - CUDA_HOME=/usr/local/cuda
+      - TORCH_CUDA_ARCH_LIST=8.6
+      - XFORMERS_ENABLE_FLASH_ATTENTION=true
     ports:
       - "8002:8000"
 
@@ -64,6 +69,10 @@ services:
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
       - CUDA_VISIBLE_DEVICES=all
+      - CUDA_HOME=/usr/local/cuda
+      - TORCH_CUDA_ARCH_LIST=8.6
+      - VLLM_USE_CUDA=1
+      - XFORMERS_ENABLE_FLASH_ATTENTION=true
     ports:
       - "8003:8000"
 
@@ -84,6 +93,9 @@ services:
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
       - CUDA_VISIBLE_DEVICES=all
+      - CUDA_HOME=/usr/local/cuda
+      - TORCH_CUDA_ARCH_LIST=8.6
+      - XFORMERS_ENABLE_FLASH_ATTENTION=true
     ports:
       - "8004:8000"
 

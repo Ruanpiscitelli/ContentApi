@@ -20,6 +20,12 @@ Requisitos:
 - Git com suporte ao Git LFS instalado.
 - Python 3.8+.
 - A biblioteca 'requests' para download dos arquivos extras.
+
+Nota: exllama foi removido dos requirements devido a problemas de compatibilidade.
+Se necessário, pode ser instalado manualmente ou substituído por alternativas como:
+- exllamav2
+- llama-cpp-python
+- transformers com quantização nativa
 """
 
 import os
