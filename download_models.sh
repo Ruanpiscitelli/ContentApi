@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Cores para output
 RED='\033[0;31m'
@@ -33,7 +33,7 @@ download_model() {
 }
 
 # Lista de modelos para download manual
-models=(
+declare -a models=(
     "texto/MiniCPM-o-2_6:openbmb/MiniCPM-o-2_6"
     "texto/DeepSeek-R1-Distill-Qwen-32B-abliterated:huihui-ai/DeepSeek-R1-Distill-Qwen-32B-abliterated"
     "imagem/animagine-xl-4.0:cagliostrolab/animagine-xl-4.0"
