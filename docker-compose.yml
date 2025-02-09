@@ -6,7 +6,8 @@ x-common-deploy: &common-deploy
       reservations:
         devices:
           - driver: nvidia
-            capabilities: [gpu, utility, compute]
+            capabilities: [gpu]
+            count: 1
     update_config:
       parallelism: 1
       delay: 10s
@@ -77,6 +78,7 @@ services:
             - driver: nvidia
               device_ids: ['0']
               capabilities: [gpu]
+    runtime: nvidia
 
   image-generator:
     build:
@@ -108,6 +110,7 @@ services:
             - driver: nvidia
               device_ids: ['1']
               capabilities: [gpu]
+    runtime: nvidia
 
   text-generation:
     build:
@@ -141,6 +144,7 @@ services:
             - driver: nvidia
               device_ids: ['2']
               capabilities: [gpu]
+    runtime: nvidia
 
   voice-generator:
     build:
@@ -172,6 +176,7 @@ services:
       - XFORMERS_ENABLE_FLASH_ATTENTION=true
     networks:
       - ai-network
+    runtime: nvidia
 
   redis:
     image: redis:alpine
