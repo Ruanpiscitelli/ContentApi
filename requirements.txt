@@ -13,12 +13,12 @@ starlette>=0.36.3
 sse-starlette>=1.8.2
 
 # AI/ML Core
-transformers>=4.35.2
+transformers==4.48.3
 diffusers>=0.24.0
 accelerate>=0.24.1
 safetensors>=0.4.2
 vllm>=0.3.3
-flash-attn>=2.5.3
+flash-attn==2.7.4
 xformers>=0.0.24
 
 # LLM & Language
@@ -79,3 +79,5 @@ watchdog>=4.0.0
 
 # Added from the code block
 requests>=2.31.0
+
+torch==2.2.1

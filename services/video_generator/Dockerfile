@@ -1,13 +1,9 @@
-FROM nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04
+FROM pytorch/pytorch:2.2.1-cuda12.1-cudnn8-runtime
 
-# Configurar timezone
 ENV TZ=America/Sao_Paulo
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
-# Instalar dependências do sistema
 RUN apt-get update && apt-get install -y \
-    python3.10 \
-    python3-pip \
     git \
     git-lfs \
     build-essential \
@@ -16,26 +12,17 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-# Instalar dependências básicas primeiro
-RUN pip3 install --no-cache-dir \
-    packaging \
-    setuptools \
-    wheel
-
-# Copiar arquivos necessários
+# Instalar dependências base primeiro
 COPY requirements.txt .
+RUN pip3 install --no-cache-dir packaging setuptools wheel && \
+    pip3 install --no-cache-dir torch==2.2.1 && \
+    pip3 install --no-cache-dir -r requirements.txt
+
 COPY download_models.py .
 COPY services/video_generator ./services/video_generator
 COPY shared ./shared
 
-# Instalar dependências Python
-RUN pip3 install --no-cache-dir -r requirements.txt
-
-# Baixar modelos
 RUN python3 download_models.py
 
-# Expor porta
 EXPOSE 8000
-
-# Comando para iniciar o serviço
 CMD ["uvicorn", "services.video_generator.app:app", "--host", "0.0.0.0", "--port", "8000"]

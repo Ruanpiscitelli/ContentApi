@@ -11,4 +11,12 @@ tokenizer_config.json
 
 # Manter apenas os arquivos de exemplo e README
 !README.md
-!.gitignore 
+!.gitignore
+
+# Ignorar modelos e caches
+models/
+__pycache__/
+*.pyc
+
+# Manter arquivos essenciais
+!models/.gitkeep 

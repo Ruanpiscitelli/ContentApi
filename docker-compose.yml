@@ -13,11 +13,11 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              count: 1
-              capabilities: [gpu]
+              count: all
+              capabilities: [gpu, utility, compute]
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
-      - NVIDIA_DRIVER_CAPABILITIES=all
+      - CUDA_VISIBLE_DEVICES=all
     ports:
       - "8001:8000"
     healthcheck:
@@ -38,11 +38,11 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              count: 1
-              capabilities: [gpu]
+              count: all
+              capabilities: [gpu, utility, compute]
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
-      - NVIDIA_DRIVER_CAPABILITIES=all
+      - CUDA_VISIBLE_DEVICES=all
     ports:
       - "8002:8000"
 
@@ -58,11 +58,11 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              count: 1
-              capabilities: [gpu]
+              count: all
+              capabilities: [gpu, utility, compute]
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
-      - NVIDIA_DRIVER_CAPABILITIES=all
+      - CUDA_VISIBLE_DEVICES=all
     ports:
       - "8003:8000"
 
@@ -78,11 +78,11 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              count: 1
-              capabilities: [gpu]
+              count: all
+              capabilities: [gpu, utility, compute]
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
-      - NVIDIA_DRIVER_CAPABILITIES=all
+      - CUDA_VISIBLE_DEVICES=all
     ports:
       - "8004:8000"
 
