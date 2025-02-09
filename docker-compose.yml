@@ -59,112 +59,83 @@ services:
           devices:
             - driver: nvidia
               count: 1
+              capabilities: [gpu, utility, compute]
     runtime: nvidia
-    depends_on:
-      redis:
-        condition: service_healthy
 
   image-generator:
+    <<: *common-settings
     build:
       context: .
       dockerfile: services/image_generator/Dockerfile
     volumes:
       - ./models:/app/models:ro
       - ./shared:/app/shared:ro
-    <<: *common-settings
     environment:
       - NVIDIA_VISIBLE_DEVICES=1
       - CUDA_VISIBLE_DEVICES=1
-      - CUDA_HOME=/usr/local/cuda
-      - TORCH_CUDA_ARCH_LIST=8.6
-      - XFORMERS_ENABLE_FLASH_ATTENTION=true
     ports:
       - "8002:8000"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 180s
     deploy:
       resources:
+        limits:
+          cpus: '4'
+          memory: 16G
         reservations:
           devices:
             - driver: nvidia
               count: 1
+              capabilities: [gpu, utility, compute]
     runtime: nvidia
-    depends_on:
-      redis:
-        condition: service_healthy
 
   text-generation:
+    <<: *common-settings
     build:
       context: .
       dockerfile: services/text_generation/Dockerfile
     volumes:
       - ./models:/app/models:ro
       - ./shared:/app/shared:ro
-      - /tmp:/tmp
-    <<: *common-settings
     environment:
       - NVIDIA_VISIBLE_DEVICES=2
       - CUDA_VISIBLE_DEVICES=2
-      - CUDA_HOME=/usr/local/cuda
-      - TORCH_CUDA_ARCH_LIST=8.6
-      - VLLM_USE_CUDA=1
-      - XFORMERS_ENABLE_FLASH_ATTENTION=true
     ports:
-      - "8003:8000"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 180s
+      - "8003:9000"
     deploy:
       resources:
+        limits:
+          cpus: '4'
+          memory: 16G
         reservations:
           devices:
             - driver: nvidia
               count: 1
+              capabilities: [gpu, utility, compute]
     runtime: nvidia
-    depends_on:
-      redis:
-        condition: service_healthy
 
   voice-generator:
+    <<: *common-settings
     build:
       context: .
       dockerfile: services/voice_generator/Dockerfile
-    ports:
-      - "8004:9000"
     volumes:
       - ./models:/app/models:ro
       - ./shared:/app/shared:ro
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=3
+      - CUDA_VISIBLE_DEVICES=3
+    ports:
+      - "8004:9000"
     deploy:
       resources:
+        limits:
+          cpus: '4'
+          memory: 16G
         reservations:
           devices:
             - driver: nvidia
               count: 1
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 180s
-    environment:
-      - NVIDIA_VISIBLE_DEVICES=3
-      - CUDA_VISIBLE_DEVICES=3
-      - CUDA_HOME=/usr/local/cuda
-      - TORCH_CUDA_ARCH_LIST=8.6
-      - XFORMERS_ENABLE_FLASH_ATTENTION=true
-    networks:
-      - ai-network
+              capabilities: [gpu, utility, compute]
     runtime: nvidia
-    depends_on:
-      redis:
-        condition: service_healthy
 
   redis:
     image: redis:alpine
@@ -183,17 +154,9 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
-    security_opt:
-      - no-new-privileges:true
-    read_only: true
-    tmpfs:
-      - /tmp:exec
-    cap_drop:
-      - ALL
 
 volumes:
   redis_data:
-    driver: local
 
 networks:
   default:
