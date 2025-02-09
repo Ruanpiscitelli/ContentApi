@@ -31,4 +31,4 @@ EXPOSE 8000
 COPY services/image_generator/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-ENTRYPOINT ["/entrypoint.sh"]
+CMD ["uvicorn", "services.image_generator.app:app", "--host", "0.0.0.0", "--port", "8000"]

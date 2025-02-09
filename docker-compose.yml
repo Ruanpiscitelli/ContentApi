@@ -37,6 +37,7 @@ services:
       - ./shared:/app/shared:ro
     <<: *common-settings
     environment:
+      - SKIP_MODEL_DOWNLOAD=true
       - NVIDIA_VISIBLE_DEVICES=0
       - CUDA_VISIBLE_DEVICES=0
       - CUDA_HOME=/usr/local/cuda
@@ -71,6 +72,7 @@ services:
       - ./models:/app/models:ro
       - ./shared:/app/shared:ro
     environment:
+      - SKIP_MODEL_DOWNLOAD=true
       - NVIDIA_VISIBLE_DEVICES=1
       - CUDA_VISIBLE_DEVICES=1
     ports:
@@ -121,10 +123,36 @@ services:
       - ./models:/app/models:ro
       - ./shared:/app/shared:ro
     environment:
+      - SKIP_MODEL_DOWNLOAD=true
       - NVIDIA_VISIBLE_DEVICES=3
       - CUDA_VISIBLE_DEVICES=3
     ports:
       - "8004:9000"
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 16G
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu, utility, compute]
+    runtime: nvidia
+
+  video-editor:
+    <<: *common-settings
+    build:
+      context: .
+      dockerfile: services/video_editor/Dockerfile
+    volumes:
+      - ./models:/app/models:ro
+      - ./shared:/app/shared:ro
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=4
+      - CUDA_VISIBLE_DEVICES=4
+    ports:
+      - "8005:8000"
     deploy:
       resources:
         limits:
