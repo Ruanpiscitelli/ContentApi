@@ -273,3 +273,11 @@ Ensure the generated token is added to your `.env` file and included in the `Aut
 ---
 
 This README provides a comprehensive overview of the project, covering its features, technologies, structure, and deployment instructions tailored for a single Docker container deployment with ngrok exposure. Enjoy building your AI content generation server!
+
+
+
+# Limpar cache do Docker
+docker builder prune -f
+
+# Reconstruir
+docker-compose build --no-cache
