@@ -15,20 +15,20 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 # Instalar dependências base primeiro
-COPY requirements.txt .
-RUN pip3 install --no-cache-dir packaging setuptools wheel && \
-    pip3 install --no-cache-dir torch==2.2.1 && \
-    pip3 install --no-cache-dir -r requirements.txt
+COPY services/image_generator/requirements.txt .
+RUN pip3 install --no-cache-dir -r requirements.txt
 
-COPY download_models.py .
 COPY services/image_generator ./services/image_generator
 COPY shared ./shared
 
-# Baixar modelos
-RUN python3 download_models.py
+# Criar diretório de modelos
+RUN mkdir -p /app/models
 
 # Expor porta
 EXPOSE 8000
 
-# Comando para iniciar o serviço
-CMD ["uvicorn", "services.image_generator.app:app", "--host", "0.0.0.0", "--port", "8000"]
+# Script de inicialização
+COPY services/image_generator/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+ENTRYPOINT ["/entrypoint.sh"]
