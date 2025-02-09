@@ -125,27 +125,29 @@ services:
     build:
       context: .
       dockerfile: services/voice_generator/Dockerfile
-      args:
-        REQUIREMENTS_FILE: services/voice_generator/requirements.txt
-    volumes:
-      - ./models:/app/models:ro
-      - ./shared:/app/shared:ro
-    <<: *common-deploy
-    <<: *common-settings
-    environment:
-      - NVIDIA_VISIBLE_DEVICES=all
-      - CUDA_VISIBLE_DEVICES=all
-      - CUDA_HOME=/usr/local/cuda
-      - TORCH_CUDA_ARCH_LIST=8.6
-      - XFORMERS_ENABLE_FLASH_ATTENTION=true
     ports:
       - "8004:9000"
+    volumes:
+      - ./shared:/app/shared:ro
+      - ./models:/app/models:ro
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 60s
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - CUDA_VISIBLE_DEVICES=all
+    networks:
+      - ai-network
 
   redis:
     image: redis:alpine
@@ -179,6 +181,12 @@ volumes:
 
 networks:
   default:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.28.0.0/16
+  ai-network:
     driver: bridge
     ipam:
       driver: default

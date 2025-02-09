@@ -4,6 +4,8 @@ FROM python:3.12-slim-bookworm AS builder
 # Instalar dependências de sistema
 RUN apt-get update && apt-get install -y \
     ca-certificates \
+    git \
+    git-lfs \
     libsox-dev \
     build-essential \
     cmake \
@@ -33,9 +35,13 @@ ENV GRADIO_SERVER_NAME="0.0.0.0"
 ENV GRADIO_SERVER_PORT="9000"
 # Path base da API
 ENV GRADIO_ROOT_PATH=""
+ENV PYTHONUNBUFFERED=1
+ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && apt-get install -y \
     ca-certificates \
+    git \
+    git-lfs \
     libsox-dev \
     ffmpeg \
     && rm -rf /var/lib/apt/lists/*
@@ -51,6 +57,10 @@ COPY services/voice_generator ./services/voice_generator
 COPY shared ./shared
 
 RUN python3 download_models.py
+
+# Healthcheck
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:9000/health || exit 1
 
 EXPOSE 9000
 CMD ["uvicorn", "services.voice_generator.app:app", "--host", "0.0.0.0", "--port", "9000"]
