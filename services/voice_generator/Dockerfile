@@ -1,47 +1,45 @@
 # Build stage
-FROM pytorch/pytorch:2.2.1-cuda12.1-cudnn8-devel AS builder
+FROM python:3.12-slim-bookworm AS builder
 
-# Instalar git para clonar repositórios
+# Instalar dependências de sistema
 RUN apt-get update && apt-get install -y \
-    git \
-    git-lfs \
+    ca-certificates \
+    libsox-dev \
     build-essential \
-    python3-dev \
-    ninja-build \
     cmake \
+    libasound-dev \
+    portaudio19-dev \
+    libportaudio2 \
+    libportaudiocpp0 \
+    ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /build
-COPY services/voice_generator/requirements.txt .
 
-# Instalar com flags específicas para CUDA
-RUN pip install --no-cache-dir packaging setuptools wheel && \
-    TORCH_CUDA_ARCH_LIST="8.6" pip install --no-cache-dir -r requirements.txt
+# Instalar torch primeiro
+RUN pip install --no-cache-dir torch==2.4.1 torchaudio==2.4.1 --index-url https://download.pytorch.org/whl/cu121
+
+COPY services/voice_generator/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Runtime stage
-FROM pytorch/pytorch:2.2.1-cuda12.1-cudnn8-runtime
+FROM python:3.12-slim-bookworm
 
 ENV TZ=America/Sao_Paulo
-ENV CUDA_HOME=/usr/local/cuda
-ENV PATH=${CUDA_HOME}/bin:${PATH}
-ENV LD_LIBRARY_PATH=${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}
+ENV GRADIO_SERVER_NAME="0.0.0.0"  # Necessário para acesso via Docker
+ENV GRADIO_SERVER_PORT="9000"     # Porta explícita
+ENV GRADIO_ROOT_PATH=""           # Path base da API
 
-RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
-
-# Instalar dependências do sistema
 RUN apt-get update && apt-get install -y \
-    git \
-    git-lfs \
-    build-essential \
-    python3-dev \
-    ninja-build \
-    cmake \
+    ca-certificates \
+    libsox-dev \
+    ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
 # Copiar dependências do build stage
-COPY --from=builder /opt/conda/lib/python3.10/site-packages /opt/conda/lib/python3.10/site-packages
+COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
 
 # Copiar arquivos do serviço
 COPY download_models.py .
