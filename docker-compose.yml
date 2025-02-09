@@ -1,19 +1,19 @@
 version: '3.8'
 
 x-common-deploy: &common-deploy
-  update_config:
-    parallelism: 1
-    delay: 10s
-  restart_policy:
-    condition: on-failure
-    max_attempts: 3
-
-x-common-settings: &common-settings
   deploy:
+    update_config:
+      parallelism: 1
+      delay: 10s
+    restart_policy:
+      condition: on-failure
+      max_attempts: 3
     resources:
       limits:
         cpus: '4'
         memory: 16G
+
+x-common-settings: &common-settings
   logging:
     driver: "json-file"
     options:
