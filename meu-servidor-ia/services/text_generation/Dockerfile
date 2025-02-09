@@ -21,19 +21,33 @@ FROM python:3.10-slim
 # Instalar dependências do sistema necessárias em runtime
 RUN apt-get update && apt-get install -y \
     curl \
+    libgomp1 \
+    libcudart11.0 \
+    libnvinfer8 \
+    libnvonnxparsers8 \
+    libnvparsers8 \
+    libnvinfer-plugin8 \
     && rm -rf /var/lib/apt/lists/*
+
+# Configurar variáveis de ambiente para CUDA
+ENV CUDA_HOME=/usr/local/cuda
+ENV PATH=${CUDA_HOME}/bin:${PATH}
+ENV LD_LIBRARY_PATH=${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}
 
 WORKDIR /app
 
 # Copiar pacotes Python instalados do builder
-COPY --from=builder /usr/local/lib/python3.10/dist-packages /usr/local/lib/python3.10/dist-packages
+COPY --from=builder /usr/local/lib/python3.10/site-packages /usr/local/lib/python3.10/site-packages
 
 # Copiar código do serviço
 COPY meu-servidor-ia/services/text_generation ./meu-servidor-ia/services/text_generation
 COPY meu-servidor-ia/shared ./meu-servidor-ia/shared
 
-# Criar diretório para modelos
-RUN mkdir -p /app/models
+# Criar diretórios necessários
+RUN mkdir -p /app/models /app/cache/text /app/uploads/text
+
+# Configurar permissões
+RUN chmod -R 755 /app/models /app/cache /app/uploads
 
 # Copiar e configurar script de entrada
 COPY meu-servidor-ia/services/text_generation/run.sh /entrypoint.sh
@@ -47,4 +61,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 EXPOSE 8001
 
 # Definir ponto de entrada
-ENTRYPOINT ["/entrypoint.sh"] 
+ENTRYPOINT ["/entrypoint.sh"]

@@ -21,19 +21,27 @@ FROM python:3.10-slim
 # Instalar dependências do sistema necessárias em runtime
 RUN apt-get update && apt-get install -y \
     curl \
+    postgresql-client \
+    sqlite3 \
+    zlib1g \
+    liblzma5 \
+    libzstd1 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
 # Copiar pacotes Python instalados do builder
-COPY --from=builder /usr/local/lib/python3.10/dist-packages /usr/local/lib/python3.10/dist-packages
+COPY --from=builder /usr/local/lib/python3.10/site-packages /usr/local/lib/python3.10/site-packages
 
 # Copiar código do serviço
 COPY meu-servidor-ia/services/dashboard ./meu-servidor-ia/services/dashboard
 COPY meu-servidor-ia/shared ./meu-servidor-ia/shared
 
 # Criar diretórios necessários
-RUN mkdir -p /app/data /app/logs /app/uploads
+RUN mkdir -p /app/data /app/logs /app/uploads /app/cache /app/temp
+
+# Configurar permissões
+RUN chmod -R 755 /app/data /app/logs /app/uploads /app/cache /app/temp
 
 # Copiar e configurar script de entrada
 COPY meu-servidor-ia/services/dashboard/run.sh /entrypoint.sh
