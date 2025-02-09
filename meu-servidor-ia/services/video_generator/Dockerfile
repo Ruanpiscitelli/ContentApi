@@ -1,82 +1,53 @@
 # Stage 1: Builder
-FROM nvidia/cuda:12.1.0-devel-ubuntu22.04 AS builder
+FROM pytorch/pytorch:2.2.1-cuda12.1-cudnn8-runtime AS builder
 
 # Evitar interações durante a instalação
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
-ENV CUDA_HOME=/usr/local/cuda
-ENV PATH=${CUDA_HOME}/bin:${PATH}
-ENV LD_LIBRARY_PATH=${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}
+ENV PIP_NO_CACHE_DIR=1
+ENV PIP_DISABLE_PIP_VERSION_CHECK=1
 
 # Instalar dependências essenciais
-RUN apt-get update && apt-get install -y \
-    python3.10 \
-    python3.10-dev \
-    python3-pip \
-    git \
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3-dev \
     build-essential \
     curl \
-    software-properties-common \
     ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Instalar PyTorch com CUDA
-RUN pip3 install --no-cache-dir torch==2.2.1 torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
-
-# Copiar requirements e instalar dependências Python
+# Copiar e instalar requirements primeiro (para aproveitar cache)
 COPY meu-servidor-ia/services/video_generator/requirements.txt .
-RUN pip3 install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Stage 2: Runtime
-FROM nvidia/cuda:12.1.0-runtime-ubuntu22.04
+FROM pytorch/pytorch:2.2.1-cuda12.1-cudnn8-runtime
 
 # Configurações de ambiente
 ENV TZ=America/Sao_Paulo
 ENV PYTHONPATH=/app
-ENV CUDA_HOME=/usr/local/cuda
-ENV PATH=${CUDA_HOME}/bin:${PATH}
-ENV LD_LIBRARY_PATH=${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
 
 # Instalar runtime dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3.10 \
-    python3-pip \
     curl \
     ffmpeg \
-    libgomp1 \
-    && curl -fsSL https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.1-1_all.deb -o cuda-keyring.deb \
-    && dpkg -i cuda-keyring.deb \
-    && apt-get update \
-    && apt-get install -y --no-install-recommends \
-        cuda-cudart-12-1 \
-        cuda-nvrtc-12-1 \
-        cuda-nvtx-12-1 \
-        libnvinfer8 \
-        libnvonnxparsers8 \
-        libnvparsers8 \
-        libnvinfer-plugin8 \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/* \
-    && rm cuda-keyring.deb
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
 # Copiar pacotes Python instalados do builder
-COPY --from=builder /usr/local/lib/python3.10/dist-packages /usr/local/lib/python3.10/dist-packages
+COPY --from=builder /usr/local/lib/python3.10/site-packages /usr/local/lib/python3.10/site-packages
 
 # Copiar código do serviço
 COPY meu-servidor-ia/services/video_generator ./meu-servidor-ia/services/video_generator
 COPY meu-servidor-ia/shared ./meu-servidor-ia/shared
 
 # Criar diretórios necessários
-RUN mkdir -p /app/models /app/cache/videos /app/uploads/videos
-
-# Configurar permissões
-RUN chmod -R 755 /app/models /app/cache /app/uploads
+RUN mkdir -p /app/models /app/cache/videos /app/uploads/videos \
+    && chmod -R 755 /app/models /app/cache /app/uploads
 
 # Criar e configurar script de entrada
 RUN echo '#!/bin/bash\n\ncd /app/meu-servidor-ia/services/video_generator\nuvicorn app:app --host 0.0.0.0 --port 8000' > /entrypoint.sh \
@@ -90,4 +61,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 EXPOSE 8000
 
 # Definir ponto de entrada
-ENTRYPOINT ["/entrypoint.sh"] 
+ENTRYPOINT ["/entrypoint.sh"]
