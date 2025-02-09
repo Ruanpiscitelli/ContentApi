@@ -1,19 +1,12 @@
 version: '3.8'
 
 x-common-deploy: &common-deploy
-  deploy:
-    resources:
-      reservations:
-        devices:
-          - driver: nvidia
-            capabilities: [gpu]
-            count: 1
-    update_config:
-      parallelism: 1
-      delay: 10s
-    restart_policy:
-      condition: on-failure
-      max_attempts: 3
+  update_config:
+    parallelism: 1
+    delay: 10s
+  restart_policy:
+    condition: on-failure
+    max_attempts: 3
 
 x-common-settings: &common-settings
   deploy:
@@ -76,8 +69,7 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              device_ids: ['0']
-              capabilities: [gpu]
+              count: 1
     runtime: nvidia
 
   image-generator:
@@ -108,8 +100,7 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              device_ids: ['1']
-              capabilities: [gpu]
+              count: 1
     runtime: nvidia
 
   text-generation:
@@ -142,8 +133,7 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              device_ids: ['2']
-              capabilities: [gpu]
+              count: 1
     runtime: nvidia
 
   voice-generator:
@@ -160,8 +150,7 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              device_ids: ['3']
-              capabilities: [gpu]
+              count: 1
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/health"]
       interval: 30s
