@@ -63,7 +63,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 60s
+      start_period: 180s
     deploy:
       resources:
         reservations:
@@ -71,6 +71,9 @@ services:
             - driver: nvidia
               count: 1
     runtime: nvidia
+    depends_on:
+      redis:
+        condition: service_healthy
 
   image-generator:
     build:
@@ -94,7 +97,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 60s
+      start_period: 180s
     deploy:
       resources:
         reservations:
@@ -102,6 +105,9 @@ services:
             - driver: nvidia
               count: 1
     runtime: nvidia
+    depends_on:
+      redis:
+        condition: service_healthy
 
   text-generation:
     build:
@@ -127,7 +133,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 120s
+      start_period: 180s
     deploy:
       resources:
         reservations:
@@ -135,6 +141,9 @@ services:
             - driver: nvidia
               count: 1
     runtime: nvidia
+    depends_on:
+      redis:
+        condition: service_healthy
 
   voice-generator:
     build:
@@ -156,7 +165,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 60s
+      start_period: 180s
     environment:
       - NVIDIA_VISIBLE_DEVICES=3
       - CUDA_VISIBLE_DEVICES=3
@@ -166,6 +175,9 @@ services:
     networks:
       - ai-network
     runtime: nvidia
+    depends_on:
+      redis:
+        condition: service_healthy
 
   redis:
     image: redis:alpine

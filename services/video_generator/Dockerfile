@@ -13,6 +13,7 @@ RUN apt-get update && apt-get install -y \
     build-essential \
     ninja-build \
     cmake \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /build
@@ -40,6 +41,7 @@ RUN apt-get update && apt-get install -y \
     python3-pip \
     git \
     git-lfs \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
