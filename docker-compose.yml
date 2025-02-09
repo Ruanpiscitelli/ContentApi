@@ -38,6 +38,7 @@ services:
     <<: *common-settings
     environment:
       - SKIP_MODEL_DOWNLOAD=true
+      - PYTHONPATH=/app
       - NVIDIA_VISIBLE_DEVICES=0
       - CUDA_VISIBLE_DEVICES=0
       - CUDA_HOME=/usr/local/cuda
@@ -50,7 +51,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 180s
+      start_period: 60s
     deploy:
       resources:
         limits:
@@ -62,6 +63,11 @@ services:
               count: 1
               capabilities: [gpu, utility, compute]
     runtime: nvidia
+    depends_on:
+      redis:
+        condition: service_healthy
+      models:
+        condition: service_completed_successfully
 
   image-generator:
     <<: *common-settings
@@ -168,10 +174,11 @@ services:
 
   redis:
     image: redis:alpine
-    ports:
-      - "6379:6379"
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
     volumes:
       - redis_data:/data
+    sysctls:
+      - vm.overcommit_memory=1
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -216,4 +223,12 @@ dashboard:
     - image-generator
     - text-generation
     - voice-generator
-    - video-editor 
+    - video-editor
+
+models:
+  build:
+    context: .
+    dockerfile: Dockerfile.models
+  volumes:
+    - ./models:/app/models
+  command: ["bash", "download_models.sh"] 

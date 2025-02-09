@@ -2,6 +2,7 @@ FROM pytorch/pytorch:2.2.1-cuda12.1-cudnn8-runtime
 
 # Configurar timezone
 ENV TZ=America/Sao_Paulo
+ENV PYTHONPATH=/app
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
 # Instalar dependências do sistema
@@ -20,7 +21,7 @@ RUN pip3 install --no-cache-dir -r requirements.txt
 
 COPY services/image_generator ./services/image_generator
 COPY shared ./shared
-WORKDIR /app/services/image_generator
+WORKDIR /app
 
 # Criar diretório de modelos
 RUN mkdir -p /app/models
@@ -32,4 +33,4 @@ EXPOSE 8000
 COPY services/image_generator/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-CMD ["uvicorn", "services.image_generator.app:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "services.image_generator.app:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]

@@ -1,26 +1,20 @@
 #!/bin/bash
 set -e
 
-# Verifica se os modelos necessários existem
-check_models() {
-    required_models=(
-        "/app/models/imagem/animagine-xl-4.0"
-        "/app/models/imagem/ultimate-realistic-mix-v2-sdxl"
-    )
-
-    for model in "${required_models[@]}"; do
-        if [ ! -d "$model" ]; then
-            echo "ERRO: Modelo necessário não encontrado: $model"
-            echo "Por favor, baixe os modelos manualmente antes de iniciar o container"
+# Função para verificar se modelo existe
+check_model() {
+    if [ ! -d "$1" ]; then
+        echo "ERRO: Modelo necessário não encontrado: $1"
+        if [ "$SKIP_MODEL_DOWNLOAD" != "true" ]; then
             exit 1
         fi
-    done
+    fi
 }
 
-# Verifica modelos apenas se SKIP_MODEL_DOWNLOAD não estiver definido
-if [ "$SKIP_MODEL_DOWNLOAD" != "true" ]; then
-    check_models
-fi
+# Verificar modelos antes de iniciar
+for model in /app/models/*; do
+    check_model "$model"
+done
 
-# Inicia a aplicação
-exec uvicorn services.image_generator.app:app --host 0.0.0.0 --port 8000 
+# Iniciar aplicação
+exec "$@" 
