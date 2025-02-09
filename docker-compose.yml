@@ -1,4 +1,4 @@
-version: '3.8'
+
 
 x-common-deploy: &common-deploy
   deploy:
@@ -54,12 +54,6 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-    develop:
-      watch:
-        - action: rebuild
-          path: ./services/video_generator
-        - action: rebuild
-          path: ./shared
 
   image-generator:
     build:
@@ -83,12 +77,6 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-    develop:
-      watch:
-        - action: rebuild
-          path: ./services/image_generator
-        - action: rebuild
-          path: ./shared
 
   text-generation:
     build:
@@ -113,12 +101,6 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-    develop:
-      watch:
-        - action: rebuild
-          path: ./services/text_generation
-        - action: rebuild
-          path: ./shared
 
   voice-generator:
     build:
@@ -142,12 +124,6 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-    develop:
-      watch:
-        - action: rebuild
-          path: ./services/voice_generator
-        - action: rebuild
-          path: ./shared
 
   redis:
     image: redis:alpine
