@@ -21,6 +21,8 @@ FROM python:3.10-slim
 # Instalar dependências do sistema necessárias em runtime
 RUN apt-get update && apt-get install -y \
     curl \
+    gnupg2 \
+    ca-certificates \
     libgl1-mesa-glx \
     libglib2.0-0 \
     libsm6 \
@@ -29,12 +31,17 @@ RUN apt-get update && apt-get install -y \
     libgomp1 \
     libgstreamer1.0-0 \
     gstreamer1.0-plugins-base \
-    libcudart11.0 \
+    && curl -fsSL https://developer.download.nvidia.com/compute/cuda/repos/debian11/x86_64/cuda-keyring_1.0-1_all.deb -o cuda-keyring.deb \
+    && dpkg -i cuda-keyring.deb \
+    && apt-get update \
+    && apt-get install -y \
+    cuda-runtime-11-8 \
     libnvinfer8 \
     libnvonnxparsers8 \
     libnvparsers8 \
     libnvinfer-plugin8 \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && rm cuda-keyring.deb
 
 # Configurar variáveis de ambiente para CUDA
 ENV CUDA_HOME=/usr/local/cuda
