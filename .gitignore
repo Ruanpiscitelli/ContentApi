@@ -15,6 +15,7 @@ tokenizer_config.json
 
 # Ignorar modelos e caches
 models/
+.cache/
 __pycache__/
 *.pyc
 

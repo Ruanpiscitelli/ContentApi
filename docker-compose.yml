@@ -1,20 +1,46 @@
 version: '3.8'
 
+x-common-deploy: &common-deploy
+  deploy:
+    resources:
+      reservations:
+        devices:
+          - driver: nvidia
+            count: all
+            capabilities: [gpu, utility, compute]
+
+x-common-settings: &common-settings
+  logging:
+    driver: "json-file"
+    options:
+      max-size: "10m"
+      max-file: "3"
+  ulimits:
+    memlock: -1
+    stack: 67108864
+  shm_size: '2gb'
+  security_opt:
+    - no-new-privileges:true
+  read_only: true
+  tmpfs:
+    - /tmp
+  cap_drop:
+    - ALL
+  restart: unless-stopped
+  depends_on:
+    redis:
+      condition: service_healthy
+
 services:
   video-generator:
     build:
       context: .
       dockerfile: services/video_generator/Dockerfile
     volumes:
-      - ./models:/app/models
-      - ./shared:/app/shared
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu, utility, compute]
+      - ./models:/app/models:ro
+      - ./shared:/app/shared:ro
+    <<: *common-deploy
+    <<: *common-settings
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
       - CUDA_VISIBLE_DEVICES=all
@@ -28,21 +54,22 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+    develop:
+      watch:
+        - action: rebuild
+          path: ./services/video_generator
+        - action: rebuild
+          path: ./shared
 
   image-generator:
     build:
       context: .
       dockerfile: services/image_generator/Dockerfile
     volumes:
-      - ./models:/app/models
-      - ./shared:/app/shared
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu, utility, compute]
+      - ./models:/app/models:ro
+      - ./shared:/app/shared:ro
+    <<: *common-deploy
+    <<: *common-settings
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
       - CUDA_VISIBLE_DEVICES=all
@@ -51,21 +78,27 @@ services:
       - XFORMERS_ENABLE_FLASH_ATTENTION=true
     ports:
       - "8002:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    develop:
+      watch:
+        - action: rebuild
+          path: ./services/image_generator
+        - action: rebuild
+          path: ./shared
 
   text-generation:
     build:
       context: .
       dockerfile: services/text_generation/Dockerfile
     volumes:
-      - ./models:/app/models
-      - ./shared:/app/shared
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu, utility, compute]
+      - ./models:/app/models:ro
+      - ./shared:/app/shared:ro
+    <<: *common-deploy
+    <<: *common-settings
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
       - CUDA_VISIBLE_DEVICES=all
@@ -75,21 +108,27 @@ services:
       - XFORMERS_ENABLE_FLASH_ATTENTION=true
     ports:
       - "8003:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    develop:
+      watch:
+        - action: rebuild
+          path: ./services/text_generation
+        - action: rebuild
+          path: ./shared
 
   voice-generator:
     build:
       context: .
       dockerfile: services/voice_generator/Dockerfile
     volumes:
-      - ./models:/app/models
-      - ./shared:/app/shared
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu, utility, compute]
+      - ./models:/app/models:ro
+      - ./shared:/app/shared:ro
+    <<: *common-deploy
+    <<: *common-settings
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
       - CUDA_VISIBLE_DEVICES=all
@@ -98,6 +137,17 @@ services:
       - XFORMERS_ENABLE_FLASH_ATTENTION=true
     ports:
       - "8004:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    develop:
+      watch:
+        - action: rebuild
+          path: ./services/voice_generator
+        - action: rebuild
+          path: ./shared
 
   redis:
     image: redis:alpine
@@ -105,6 +155,34 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /data
+    cap_drop:
+      - ALL
 
 volumes:
-  redis_data: 
+  redis_data:
+    driver: local
+
+networks:
+  default:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.28.0.0/16 
