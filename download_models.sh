@@ -63,14 +63,58 @@ declare -a models=(
     "texto/MiniCPM-o-2_6:openbmb/MiniCPM-o-2_6"
     "texto/DeepSeek-R1-Distill-Qwen-32B-abliterated:huihui-ai/DeepSeek-R1-Distill-Qwen-32B-abliterated"
     "imagem/animagine-xl-4.0:cagliostrolab/animagine-xl-4.0"
+    "imagem/ultimate-realistic-mix-v2-sdxl:John6666/ultimate-realistic-mix-v2-sdxl"
     "voz/fish-speech-1.5:fishaudio/fish-speech-1.5"
-    "video/stable-video-diffusion-img2vid-xt:stabilityai/stable-video-diffusion-img2vid-xt"
+    "video/FastHunyuan:FastVideo/FastHunyuan-diffusers"
 )
+
+# Função para baixar do ModelScope
+download_modelscope() {
+    local model=$1
+    local target=$2
+    
+    if check_model "$target"; then
+        return 0
+    fi
+    
+    echo "Baixando modelo do ModelScope: $model para $target..."
+    
+    # Instala modelscope_cli se necessário
+    if ! command -v modelscope-cli &> /dev/null; then
+        pip install modelscope_cli
+    fi
+    
+    modelscope-cli download --model-name $model --save-dir $target
+}
+
+# Função para baixar do CivitAI
+download_civitai() {
+    local model_id=$1
+    local target=$2
+    
+    if check_model "$target"; then
+        return 0
+    fi
+    
+    echo "Baixando modelo do CivitAI ID: $model_id para $target..."
+    mkdir -p "$target"
+    curl -L "https://civitai.com/api/download/models/$model_id" -o "$target/model.safetensors"
+}
 
 # Download dos modelos
 for model in "${models[@]}"; do
     IFS=':' read -r path repo <<< "$model"
-    download_model "$repo" "models/$path"
+    case "$repo" in
+        "FastVideo/FastHunyuan-diffusers")
+            download_modelscope "$repo" "models/$path"
+            ;;
+        "John6666/ultimate-realistic-mix-v2-sdxl")
+            download_civitai "266874" "models/$path"
+            ;;
+        *)
+            download_model "$repo" "models/$path"
+            ;;
+    esac
 done
 
 echo -e "${GREEN}Processo de download concluído${NC}" 
