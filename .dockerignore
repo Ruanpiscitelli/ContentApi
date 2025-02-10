@@ -118,6 +118,7 @@ Thumbs.db
 !meu-servidor-ia/services/*/app.py
 !meu-servidor-ia/services/*/config.py
 !meu-servidor-ia/services/*/entrypoint.sh
+!meu-servidor-ia/services/voice_generator/run.sh
 !meu-servidor-ia/services/*/routers/**
 !meu-servidor-ia/services/*/utils/**
 !meu-servidor-ia/shared/**
