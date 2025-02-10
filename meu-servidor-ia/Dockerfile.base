@@ -8,7 +8,10 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-# Copiar e instalar requirements base
+# Instalar pip atualizado
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel
+
+# Instalar requirements base
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
