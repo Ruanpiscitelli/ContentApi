@@ -1,6 +1,41 @@
 # Excluir tudo por padrão
 *
 
-# Incluir arquivos necessários
+# Incluir arquivos e diretórios necessários
 !requirements.txt
 !meu-servidor-ia/
+!meu-servidor-ia/services/
+!meu-servidor-ia/services/*/
+!meu-servidor-ia/services/*/requirements.txt
+!meu-servidor-ia/services/*/app.py
+!meu-servidor-ia/services/*/config.py
+!meu-servidor-ia/services/*/routers/**
+!meu-servidor-ia/services/*/utils/**
+!meu-servidor-ia/shared/**
+
+# Excluir arquivos desnecessários mesmo dentro dos diretórios incluídos
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/*.pyd
+**/.Python
+**/.env
+**/.venv
+**/env/
+**/venv/
+**/.git/
+**/.gitignore
+**/.cache/
+**/*.egg-info/
+**/.eggs/
+**/dist/
+**/build/
+**/.coverage
+**/.pytest_cache/
+**/htmlcov/
+
+# Excluir logs e caches
+**/logs/
+**/cache/
+**/temp/
+**/*.log
