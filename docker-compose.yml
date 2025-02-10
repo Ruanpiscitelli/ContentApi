@@ -62,8 +62,8 @@ services:
   video-generator:
     <<: [*common-settings, *gpu-settings]
     build:
-      context: .
-      dockerfile: meu-servidor-ia/services/video_generator/Dockerfile
+      context: ./meu-servidor-ia
+      dockerfile: services/video_generator/Dockerfile
       args:
         PYTHON_VERSION: "3.10"
         USER_NAME: appuser
@@ -98,8 +98,8 @@ services:
   text-generation:
     <<: *common-settings
     build:
-      context: .
-      dockerfile: meu-servidor-ia/services/text_generation/Dockerfile
+      context: ./meu-servidor-ia
+      dockerfile: services/text_generation/Dockerfile
       args:
         PYTHON_VERSION: "3.10"
         USER_NAME: appuser
@@ -116,8 +116,8 @@ services:
   voice-generator:
     <<: *common-settings
     build:
-      context: .
-      dockerfile: meu-servidor-ia/services/voice_generator/Dockerfile
+      context: ./meu-servidor-ia
+      dockerfile: services/voice_generator/Dockerfile
       args:
         PYTHON_VERSION: "3.10"
         USER_NAME: appuser
@@ -134,8 +134,8 @@ services:
   video-editor:
     <<: *common-settings
     build:
-      context: .
-      dockerfile: meu-servidor-ia/services/video-editor/Dockerfile
+      context: ./meu-servidor-ia
+      dockerfile: services/video-editor/Dockerfile
     volumes:
       - ./cache:/app/cache
       - ./logs:/app/logs
@@ -164,8 +164,8 @@ services:
   dashboard:
     <<: *common-settings
     build:
-      context: .
-      dockerfile: meu-servidor-ia/services/dashboard/Dockerfile
+      context: ./meu-servidor-ia
+      dockerfile: services/dashboard/Dockerfile
       args:
         PYTHON_VERSION: "3.10"
         USER_NAME: appuser
