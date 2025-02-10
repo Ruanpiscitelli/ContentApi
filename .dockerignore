@@ -112,6 +112,7 @@ Thumbs.db
 
 # Excluir tudo por padrão
 *
+!meu-servidor-ia/requirements.txt
 
 # Incluir explicitamente apenas o necessário
 !meu-servidor-ia/services/*/requirements.txt
@@ -127,4 +128,4 @@ Thumbs.db
 !requirements/*.txt
 
 # Ignora o arquivo global de requirements.txt para não usá-lo no build
-requirements.txt 
+requirements.txt
