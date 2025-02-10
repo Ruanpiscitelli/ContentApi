@@ -55,8 +55,8 @@ x-volumes: &common-volumes
 services:
   base:
     build:
-      context: .
-      dockerfile: meu-servidor-ia/Dockerfile.base
+      context: ./meu-servidor-ia
+      dockerfile: Dockerfile.base
     image: contentapi-base
 
   video-generator:
