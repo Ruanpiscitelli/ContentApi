@@ -154,8 +154,12 @@ services:
     runtime: nvidia
 
   redis:
-    image: redis:alpine
-    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    image: redis:7-alpine
+    command: >
+      --save 60 1
+      --loglevel warning
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
     volumes:
       - redis_data:/data
     healthcheck:
@@ -169,6 +173,12 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+    cap_add:
+      - IPC_LOCK
 
   dashboard:
     <<: *common-settings
