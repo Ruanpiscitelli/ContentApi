@@ -124,4 +124,7 @@ Thumbs.db
 !meu-servidor-ia/services/*/utils/**
 !meu-servidor-ia/shared/**
 !requirements.txt
-!requirements/*.txt 
+!requirements/*.txt
+
+# Ignora o arquivo global de requirements.txt para não usá-lo no build
+requirements.txt 

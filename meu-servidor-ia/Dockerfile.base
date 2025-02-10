@@ -17,8 +17,8 @@ WORKDIR /app
 # Atualizar pip e instalar ferramentas
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel
 
-# Instalar requirements base
-COPY requirements.txt .
+# Copiar e instalar requirements
+COPY ./meu-servidor-ia/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Runtime stage
