@@ -3,50 +3,26 @@ version: '3.8'
 # Configurações comuns para todos os serviços
 x-common-settings: &common-settings
   restart: unless-stopped
-  logging:
-    driver: "json-file"
-    options:
-      max-size: "10m"
-      max-file: "3"
-  ulimits:
-    memlock: -1
-    stack: 67108864
-  shm_size: '2gb'
+  init: true
   security_opt:
     - no-new-privileges:true
-  read_only: true
-  tmpfs:
-    - /tmp:exec,mode=1777
-    - /var/tmp:exec,mode=1777
-  cap_drop:
-    - ALL
-  cap_add:
-    - SYS_NICE
-  depends_on:
-    redis:
-      condition: service_healthy
-  init: true
-  dns:
-    - 8.8.8.8
-    - 8.8.4.4
-  stop_grace_period: 30s
   healthcheck:
     test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
     interval: 30s
     timeout: 10s
     retries: 3
-    start_period: 30s
+  logging:
+    driver: "json-file"
+    options:
+      max-size: "10m"
+      max-file: "3"
 
 # Variáveis de ambiente comuns
 x-common-env: &common-env
   PYTHONPATH: /app
-  CUDA_HOME: /usr/local/cuda
-  TORCH_CUDA_ARCH_LIST: "8.6"
-  SKIP_MODEL_DOWNLOAD: "true"
-  XFORMERS_ENABLE_FLASH_ATTENTION: "true"
-  TZ: America/Sao_Paulo
-  PYTHONUNBUFFERED: "1"
-  DEBIAN_FRONTEND: noninteractive
+  PYTHONUNBUFFERED: 1
+  TRANSFORMERS_CACHE: /app/cache/transformers
+  HF_HOME: /app/cache/huggingface
 
 # Configuração padrão de recursos
 x-resources: &service-resources
@@ -59,9 +35,32 @@ x-resources: &service-resources
         count: 1
         capabilities: [gpu, utility, compute]
 
+x-gpu-settings: &gpu-settings
+  runtime: nvidia
+  deploy:
+    resources:
+      reservations:
+        devices:
+          - driver: nvidia
+            count: 1
+            capabilities: [gpu]
+
+x-volumes: &common-volumes
+  - ./models:/app/models:ro
+  - ./logs:/app/logs
+  - ./cache:/app/cache
+  - ./uploads:/app/uploads
+  - ./temp:/app/temp
+
 services:
+  base:
+    build:
+      context: .
+      dockerfile: meu-servidor-ia/Dockerfile.base
+    image: contentapi-base
+
   video-generator:
-    <<: *common-settings
+    <<: [*common-settings, *gpu-settings]
     build:
       context: .
       dockerfile: meu-servidor-ia/services/video_generator/Dockerfile
@@ -70,21 +69,13 @@ services:
         USER_NAME: appuser
         USER_UID: 1000
         USER_GID: 1000
-    volumes:
-      - ./models:/app/models:ro
-      - ./logs:/app/logs
-      - ./cache:/app/cache
-      - ./uploads:/app/uploads
-      - ./temp:/app/temp
+    volumes: *common-volumes
     environment:
       <<: *common-env
       NVIDIA_VISIBLE_DEVICES: "0"
       CUDA_VISIBLE_DEVICES: "0"
     ports:
       - "8001:8000"
-    deploy:
-      resources: *service-resources
-    runtime: nvidia
 
   image-generator:
     <<: *common-settings
@@ -96,21 +87,13 @@ services:
         USER_NAME: appuser
         USER_UID: 1000
         USER_GID: 1000
-    volumes:
-      - ./models:/app/models:ro
-      - ./logs:/app/logs
-      - ./cache:/app/cache
-      - ./uploads:/app/uploads
-      - ./temp:/app/temp
+    volumes: *common-volumes
     environment:
       <<: *common-env
       NVIDIA_VISIBLE_DEVICES: "1"
       CUDA_VISIBLE_DEVICES: "1"
     ports:
       - "8002:8000"
-    deploy:
-      resources: *service-resources
-    runtime: nvidia
 
   text-generation:
     <<: *common-settings
@@ -122,21 +105,13 @@ services:
         USER_NAME: appuser
         USER_UID: 1000
         USER_GID: 1000
-    volumes:
-      - ./models:/app/models:ro
-      - ./logs:/app/logs
-      - ./cache:/app/cache
-      - ./uploads:/app/uploads
-      - ./temp:/app/temp
+    volumes: *common-volumes
     environment:
       <<: *common-env
       NVIDIA_VISIBLE_DEVICES: "2"
       CUDA_VISIBLE_DEVICES: "2"
     ports:
       - "8003:8000"
-    deploy:
-      resources: *service-resources
-    runtime: nvidia
 
   voice-generator:
     <<: *common-settings
@@ -148,54 +123,36 @@ services:
         USER_NAME: appuser
         USER_UID: 1000
         USER_GID: 1000
-    volumes:
-      - ./models:/app/models:ro
-      - ./logs:/app/logs
-      - ./cache:/app/cache
-      - ./uploads:/app/uploads
-      - ./temp:/app/temp
+    volumes: *common-volumes
     environment:
       <<: *common-env
       NVIDIA_VISIBLE_DEVICES: "3"
       CUDA_VISIBLE_DEVICES: "3"
     ports:
       - "8004:8000"
-    deploy:
-      resources: *service-resources
-    runtime: nvidia
 
   video-editor:
     <<: *common-settings
     build:
       context: .
-      dockerfile: meu-servidor-ia/services/video_editor/Dockerfile
-      args:
-        PYTHON_VERSION: "3.10"
-        USER_NAME: appuser
-        USER_UID: 1000
-        USER_GID: 1000
+      dockerfile: meu-servidor-ia/services/video-editor/Dockerfile
     volumes:
-      - ./models:/app/models:ro
-      - ./meu-servidor-ia/shared:/app/shared:ro
-      - ./storage:/app/storage
-      - ./logs/editor:/app/logs
+      - ./cache:/app/cache
+      - ./logs:/app/logs
+      - ./uploads:/app/uploads
     environment:
-      <<: *common-env
-      NVIDIA_VISIBLE_DEVICES: "3"
-      CUDA_VISIBLE_DEVICES: "3"
+      - PYTHONPATH=/app
+      - TRANSFORMERS_CACHE=/app/cache/transformers
+      - HF_HOME=/app/cache/huggingface
+    depends_on:
+      redis:
+        condition: service_healthy
     ports:
       - "8005:8000"
-    deploy:
-      resources: *service-resources
-    runtime: nvidia
 
   redis:
     image: redis:7-alpine
-    command: >
-      --save 60 1
-      --loglevel warning
-      --maxmemory 512mb
-      --maxmemory-policy allkeys-lru
+    command: redis-server --appendonly yes
     volumes:
       - redis_data:/data
     healthcheck:
@@ -203,21 +160,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 3
-    restart: unless-stopped
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-    deploy:
-      resources:
-        limits:
-          memory: 1G
-    cap_add:
-      - IPC_LOCK
-    read_only: true
-    security_opt:
-      - no-new-privileges:true
 
   dashboard:
     <<: *common-settings
@@ -246,7 +188,6 @@ networks:
   default:
     driver: bridge
     ipam:
-      driver: default
       config:
         - subnet: 172.28.0.0/24
 

@@ -1,13 +1,15 @@
-# Copiar código do serviço
-COPY meu-servidor-ia/services/video-editor ./meu-servidor-ia/services/video-editor
-COPY meu-servidor-ia/shared ./meu-servidor-ia/shared
+FROM contentapi-base
 
-# Ajustar o script de entrada para o caminho correto
-RUN echo '#!/bin/bash\n\
-cd /app/meu-servidor-ia/services/video-editor\n\
-if python3 -c "import uvloop" 2>/dev/null; then\n\
-    exec uvicorn app:app --host 0.0.0.0 --port 8000 --workers 1 --loop uvloop --http httptools\n\
-else\n\
-    exec uvicorn app:app --host 0.0.0.0 --port 8000 --workers 1\n\
-fi' > /entrypoint.sh && \
-    chmod +x /entrypoint.sh 
+# Copiar e instalar requirements específicos
+COPY --chown=appuser:appuser meu-servidor-ia/services/video-editor/requirements.txt .
+RUN pip install --user --no-cache-dir -r requirements.txt
+
+# Copiar código
+COPY --chown=appuser:appuser meu-servidor-ia/services/video-editor ./meu-servidor-ia/services/video-editor
+COPY --chown=appuser:appuser meu-servidor-ia/shared ./meu-servidor-ia/shared
+
+# Criar diretórios necessários
+RUN mkdir -p /app/cache/videos && \
+    chmod -R 755 /app/cache
+
+CMD ["python3", "-m", "uvicorn", "meu-servidor-ia.services.video_editor.app:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
