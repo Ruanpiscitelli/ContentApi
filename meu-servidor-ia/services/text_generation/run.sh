@@ -26,7 +26,7 @@ python3 -c "import fastapi" || { echo "FastAPI não encontrado. Instalando depen
 echo "Iniciando o serviço de geração de texto..."
 cd /app/meu-servidor-ia/services/text_generation
 if python3 -c "import uvloop" 2>/dev/null; then
-    exec python3 -m uvicorn app:app \
+    exec uvicorn app:app \
         --host 0.0.0.0 \
         --port 8001 \
         --workers 1 \
@@ -36,7 +36,7 @@ if python3 -c "import uvloop" 2>/dev/null; then
         --limit-concurrency 1000 \
         --log-level info
 else
-    exec python3 -m uvicorn app:app \
+    exec uvicorn app:app \
         --host 0.0.0.0 \
         --port 8001 \
         --workers 1 \
