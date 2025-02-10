@@ -1,131 +1,25 @@
-# Diretórios de desenvolvimento
-**/__pycache__
-**/*.py[cod]
-**/*.so
-**/*.egg
-**/*.egg-info
-dist
-build
-eggs
-parts
-bin
-var
-sdist
-develop-eggs
-.installed.cfg
-lib
-lib64
-.Python
+# Excluir tudo por padrão
+*
 
-# Ambientes virtuais
+# Incluir diretório meu-servidor-ia e seus arquivos necessários
+!meu-servidor-ia/
+!meu-servidor-ia/requirements.txt
+!meu-servidor-ia/services/*/requirements.txt
+!meu-servidor-ia/services/*/app.py
+!meu-servidor-ia/services/*/config.py
+!meu-servidor-ia/services/*/entrypoint.sh
+!meu-servidor-ia/services/*/routers/**
+!meu-servidor-ia/services/*/utils/**
+!meu-servidor-ia/shared/**
+
+# Excluir arquivos desnecessários mesmo dentro dos diretórios incluídos
+**/__pycache__
+**/*.pyc
+**/*.pyo
+**/*.pyd
+.Python
 .env
 .venv
 env/
 venv/
 ENV/
-
-# Diretórios de cache e modelos
-models/*
-!models/README.md
-.cache
-**/.cache
-**/cache
-**/__pycache__
-
-# Logs e dados temporários
-logs/
-*.log
-data/
-temp/
-tmp/
-
-# Arquivos de controle de versão
-.git
-.gitignore
-.gitattributes
-.github
-.gitlab-ci.yml
-.travis.yml
-.circleci
-
-# IDEs e editores
-.idea/
-.vscode/
-*.swp
-*.swo
-*~
-.project
-.settings
-.classpath
-*.sublime-project
-*.sublime-workspace
-
-# Arquivos de teste e documentação
-tests/
-test/
-docs/
-*.md
-!README.md
-LICENSE
-CHANGELOG.md
-CONTRIBUTING.md
-
-# Arquivos de configuração
-.env*
-.flake8
-.pylintrc
-.coverage
-.pytest_cache/
-pytest.ini
-tox.ini
-mypy.ini
-setup.cfg
-setup.py
-
-# Arquivos grandes e binários
-*.tar
-*.gz
-*.zip
-*.rar
-*.7z
-*.model
-*.pt
-*.pth
-*.onnx
-*.safetensors
-*.bin
-*.h5
-*.hdf5
-*.pkl
-*.npz
-*.npy
-
-# Arquivos específicos do Docker
-.docker/
-docker-compose*.yml
-Dockerfile*
-.dockerignore
-
-# Arquivos do sistema
-.DS_Store
-Thumbs.db
-
-# Excluir tudo por padrão
-*
-!meu-servidor-ia/requirements.txt
-
-# Incluir explicitamente apenas o necessário
-!meu-servidor-ia/services/*/requirements.txt
-!meu-servidor-ia/services/*/app.py
-!meu-servidor-ia/services/*/config.py
-!meu-servidor-ia/services/*/entrypoint.sh
-!meu-servidor-ia/services/voice_generator/run.sh
-!meu-servidor-ia/services/text_generation/run.sh
-!meu-servidor-ia/services/*/routers/**
-!meu-servidor-ia/services/*/utils/**
-!meu-servidor-ia/shared/**
-!requirements.txt
-!requirements/*.txt
-
-# Ignora o arquivo global de requirements.txt para não usá-lo no build
-requirements.txt
