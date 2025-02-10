@@ -1,16 +1,16 @@
 # Web Framework
-fastapi==0.110.0
+fastapi==0.95.2
 uvicorn==0.27.1
 python-multipart==0.0.9
-pydantic>=1.10,<2.0
+pydantic==1.10.7
 
 # HTTP e Cache
 redis==5.0.1
 requests==2.31.0
 
 # Performance
-# Removendo uvloop e httptools que são opcionais e estão causando problemas
-# uvloop e httptools são otimizações opcionais do uvicorn
+# Removendo uvloop e httptools que são opcionais
+# São otimizações opcionais do uvicorn
 
 # Utilitários
 python-dotenv==1.0.0
@@ -21,7 +21,7 @@ python-jose[cryptography]==3.3.0
 cryptography==41.0.1
 
 # Dependências para garantir compatibilidade
-starlette>=0.27.0
+starlette==0.26.1
 typing-extensions>=4.5.0
 
 # Dependências adicionais para o uvicorn
