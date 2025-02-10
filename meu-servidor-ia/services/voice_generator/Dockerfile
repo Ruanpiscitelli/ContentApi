@@ -1,66 +1,109 @@
-# Stage 1: Builder
-FROM python:3.10-slim as builder
+# Build stage
+FROM nvidia/cuda:12.1.0-devel-ubuntu22.04 AS builder
 
-# Instalar dependências do sistema
-RUN apt-get update && apt-get install -y \
+# Build arguments
+ARG PYTHON_VERSION=3.10
+ARG DEBIAN_FRONTEND=noninteractive
+ARG TZ=America/Sao_Paulo
+
+# Configurações de ambiente para build
+ENV PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    CUDA_HOME=/usr/local/cuda \
+    PATH=${CUDA_HOME}/bin:${PATH} \
+    LD_LIBRARY_PATH=${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}
+
+# Instalar dependências de build
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python${PYTHON_VERSION} \
+    python${PYTHON_VERSION}-dev \
+    python3-pip \
     build-essential \
     curl \
-    software-properties-common \
     git \
+    libsndfile1-dev \
+    libportaudio2 \
+    portaudio19-dev \
+    ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /app
+WORKDIR /build
 
-# Copiar requirements e instalar dependências Python
+# Instalar torch primeiro para otimizar cache
+RUN pip3 install --no-cache-dir torch==2.2.1 torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+
+# Copiar e instalar requirements
 COPY meu-servidor-ia/services/voice_generator/requirements.txt .
 RUN pip3 install --no-cache-dir -r requirements.txt
 
-# Stage 2: Runtime
-FROM python:3.10-slim
+# Runtime stage
+FROM nvidia/cuda:12.1.0-runtime-ubuntu22.04
 
-# Instalar dependências do sistema necessárias em runtime
-RUN apt-get update && apt-get install -y \
-    curl \
+# Runtime arguments
+ARG PYTHON_VERSION=3.10
+ARG USER_NAME=appuser
+ARG USER_UID=1000
+ARG USER_GID=1000
+
+# Configurações de ambiente para runtime
+ENV TZ=America/Sao_Paulo \
+    PYTHONPATH=/app \
+    DEBIAN_FRONTEND=noninteractive \
+    PYTHONUNBUFFERED=1 \
+    NVIDIA_VISIBLE_DEVICES=all \
+    CUDA_VISIBLE_DEVICES=all \
+    CUDA_HOME=/usr/local/cuda \
+    PATH=${CUDA_HOME}/bin:${PATH} \
+    LD_LIBRARY_PATH=${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}
+
+# Configurar timezone
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+
+# Instalar dependências runtime
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python${PYTHON_VERSION} \
+    python3-pip \
     ffmpeg \
     libsndfile1 \
-    libasound2 \
     libportaudio2 \
-    libportaudiocpp0 \
     portaudio19-dev \
-    libpulse0 \
-    libjack0 \
-    libasound2-plugins \
-    libgstreamer1.0-0 \
-    gstreamer1.0-plugins-base \
-    gstreamer1.0-plugins-good \
-    gstreamer1.0-plugins-bad \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Copiar pacotes Python instalados do builder
-COPY --from=builder /usr/local/lib/python3.10/site-packages /usr/local/lib/python3.10/site-packages
+# Criar usuário não-root
+RUN groupadd -g ${USER_GID} ${USER_NAME} && \
+    useradd -u ${USER_UID} -g ${USER_GID} -s /bin/bash -m ${USER_NAME}
+
+# Criar diretórios necessários
+RUN mkdir -p /app/models /app/cache/voice /app/uploads/voice /app/logs && \
+    chown -R ${USER_NAME}:${USER_NAME} /app
+
+# Copiar pacotes Python do builder
+COPY --from=builder /usr/local/lib/python${PYTHON_VERSION}/dist-packages /usr/local/lib/python${PYTHON_VERSION}/dist-packages
 
 # Copiar código do serviço
-COPY meu-servidor-ia/services/voice_generator ./meu-servidor-ia/services/voice_generator
-COPY meu-servidor-ia/shared ./meu-servidor-ia/shared
+COPY --chown=${USER_NAME}:${USER_NAME} meu-servidor-ia/services/voice_generator /app/meu-servidor-ia/services/voice_generator/
+COPY --chown=${USER_NAME}:${USER_NAME} meu-servidor-ia/shared /app/meu-servidor-ia/shared/
 
-# Criar diretório para modelos e áudios
-RUN mkdir -p /app/models /app/uploads/audio /app/cache/audio
+# Criar script de entrada
+RUN echo '#!/bin/bash\n\
+cd /app/meu-servidor-ia/services/voice_generator\n\
+if python3 -c "import uvloop" 2>/dev/null; then\n\
+    exec uvicorn app:app --host 0.0.0.0 --port 8000 --workers 1 --loop uvloop --http httptools\n\
+else\n\
+    exec uvicorn app:app --host 0.0.0.0 --port 8000 --workers 1\n\
+fi' > /entrypoint.sh && \
+    chmod +x /entrypoint.sh && \
+    chown ${USER_NAME}:${USER_NAME} /entrypoint.sh
 
-# Configurar permissões
-RUN chmod -R 755 /app/models /app/uploads /app/cache
+# Mudar para usuário não-root
+USER ${USER_NAME}
 
-# Copiar e configurar script de entrada
-COPY meu-servidor-ia/services/voice_generator/run.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+# Healthcheck mais robusto
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
 
-# Configurar health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8003/health || exit 1
+EXPOSE 8000
 
-# Expor porta do serviço
-EXPOSE 8003
-
-# Definir ponto de entrada
 ENTRYPOINT ["/entrypoint.sh"]
