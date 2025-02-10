@@ -41,7 +41,11 @@ RUN chmod -R 755 /app/models /app/cache /app/uploads /app/logs && \
 # Criar script de entrada
 RUN echo '#!/bin/bash\n\
 cd /app/meu-servidor-ia/services/video_generator\n\
-exec uvicorn app:app --host 0.0.0.0 --port 8000 --workers 1 --loop uvloop --http httptools' > /entrypoint.sh && \
+if python -c "import uvloop" 2>/dev/null; then\n\
+    exec uvicorn app:app --host 0.0.0.0 --port 8000 --workers 1 --loop uvloop --http httptools\n\
+else\n\
+    exec uvicorn app:app --host 0.0.0.0 --port 8000 --workers 1\n\
+fi' > /entrypoint.sh && \
     chmod +x /entrypoint.sh
 
 # Configurar usuário não-root

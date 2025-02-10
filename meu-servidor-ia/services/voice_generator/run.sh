@@ -38,20 +38,24 @@ export CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-0}
 export NVIDIA_VISIBLE_DEVICES=${NVIDIA_VISIBLE_DEVICES:-all}
 export NVIDIA_DRIVER_CAPABILITIES=${NVIDIA_DRIVER_CAPABILITIES:-compute,utility}
 
-# Verifica se uvicorn está instalado
-if ! python3 -c "import uvicorn" 2>/dev/null; then
-    echo "Instalando uvicorn..."
-    pip3 install uvicorn[standard]
-fi
-
 echo "Iniciando servidor de geração de voz..."
 # Inicia o servidor
-exec uvicorn app:app \
-    --host ${API_HOST:-0.0.0.0} \
-    --port ${API_PORT:-8000} \
-    --workers 1 \
-    --loop uvloop \
-    --http httptools \
-    --timeout-keep-alive 120 \
-    --limit-concurrency 1000 \
-    --log-level info 
+if python3 -c "import uvloop" 2>/dev/null; then
+    exec uvicorn app:app \
+        --host ${API_HOST:-0.0.0.0} \
+        --port ${API_PORT:-8003} \
+        --workers 1 \
+        --loop uvloop \
+        --http httptools \
+        --timeout-keep-alive 120 \
+        --limit-concurrency 1000 \
+        --log-level info
+else
+    exec uvicorn app:app \
+        --host ${API_HOST:-0.0.0.0} \
+        --port ${API_PORT:-8003} \
+        --workers 1 \
+        --timeout-keep-alive 120 \
+        --limit-concurrency 1000 \
+        --log-level info
+fi

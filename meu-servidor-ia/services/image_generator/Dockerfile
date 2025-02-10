@@ -77,7 +77,13 @@ RUN mkdir -p /app/models /app/cache/images /app/uploads/images
 RUN chmod -R 755 /app/models /app/cache /app/uploads
 
 # Criar e configurar script de entrada
-RUN echo '#!/bin/bash\n\ncd /app/meu-servidor-ia/services/image_generator\nuvicorn app:app --host 0.0.0.0 --port 8000' > /entrypoint.sh \
+RUN echo '#!/bin/bash\n\
+cd /app/meu-servidor-ia/services/image_generator\n\
+if python -c "import uvloop" 2>/dev/null; then\n\
+    exec uvicorn app:app --host 0.0.0.0 --port 8000 --workers 1 --loop uvloop --http httptools\n\
+else\n\
+    exec uvicorn app:app --host 0.0.0.0 --port 8000 --workers 1\n\
+fi' > /entrypoint.sh \
     && chmod +x /entrypoint.sh
 
 # Configurar health check
