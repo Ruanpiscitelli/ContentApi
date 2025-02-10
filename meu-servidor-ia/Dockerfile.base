@@ -6,9 +6,15 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
+# Configurar pip
+ENV PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_DEFAULT_TIMEOUT=100 \
+    PYTHONUNBUFFERED=1
+
 WORKDIR /app
 
-# Instalar pip atualizado
+# Atualizar pip e instalar ferramentas
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel
 
 # Instalar requirements base
