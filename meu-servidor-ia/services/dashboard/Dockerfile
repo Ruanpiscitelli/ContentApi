@@ -1,4 +1,4 @@
-# Stage 1: Builder
+# Build stage
 FROM python:3.10-slim as builder
 
 # Instalar dependências do sistema
@@ -12,20 +12,19 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 # Copiar requirements e instalar dependências Python
-COPY meu-servidor-ia/services/dashboard/requirements.txt .
+COPY services/dashboard/requirements.txt .
 RUN pip3 install --no-cache-dir -r requirements.txt
 
-# Stage 2: Runtime
+# Runtime stage
 FROM python:3.10-slim
 
-# Instalar dependências do sistema necessárias em runtime
+# Instalar dependências runtime
 RUN apt-get update && apt-get install -y \
     curl \
     postgresql-client \
     sqlite3 \
     zlib1g \
     liblzma5 \
-    libzstd1 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -34,25 +33,28 @@ WORKDIR /app
 COPY --from=builder /usr/local/lib/python3.10/site-packages /usr/local/lib/python3.10/site-packages
 
 # Copiar código do serviço
-COPY meu-servidor-ia/services/dashboard ./meu-servidor-ia/services/dashboard
-COPY meu-servidor-ia/shared ./meu-servidor-ia/shared
+COPY services/dashboard ./services/dashboard
+COPY shared ./shared
 
 # Criar diretórios necessários
-RUN mkdir -p /app/data /app/logs /app/uploads /app/cache /app/temp
+RUN mkdir -p /app/data /app/logs /app/uploads /app/cache /app/temp && \
+    chmod -R 755 /app/data /app/logs /app/uploads /app/cache /app/temp
 
-# Configurar permissões
-RUN chmod -R 755 /app/data /app/logs /app/uploads /app/cache /app/temp
+# Criar script de entrada
+RUN echo '#!/bin/bash\n\
+cd /app/services/dashboard\n\
+if python3 -c "import uvloop" 2>/dev/null; then\n\
+    exec uvicorn app:app --host 0.0.0.0 --port 8000 --workers 1 --loop uvloop --http httptools\n\
+else\n\
+    exec uvicorn app:app --host 0.0.0.0 --port 8000 --workers 1\n\
+fi' > /entrypoint.sh && \
+    chmod +x /entrypoint.sh
 
-# Copiar e configurar script de entrada
-COPY meu-servidor-ia/services/dashboard/run.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
-
-# Configurar health check
+# Healthcheck
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
-# Expor porta do serviço
 EXPOSE 8000
 
-# Definir ponto de entrada
+# Iniciar o serviço
 ENTRYPOINT ["/entrypoint.sh"] 
