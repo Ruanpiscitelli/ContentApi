@@ -67,6 +67,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libsndfile1 \
     libportaudio2 \
     portaudio19-dev \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -89,10 +90,38 @@ COPY --chown=${USER_NAME}:${USER_NAME} meu-servidor-ia/shared /app/meu-servidor-
 # Criar script de entrada
 RUN echo '#!/bin/bash\n\
 cd /app/meu-servidor-ia/services/voice_generator\n\
+\n\
+# Verificar e criar diretórios necessários\n\
+for dir in models cache/voice uploads/voice logs; do\n\
+    if [ ! -d "/app/$dir" ]; then\n\
+        echo "Criando diretório /app/$dir"\n\
+        mkdir -p "/app/$dir"\n\
+        chmod 755 "/app/$dir"\n\
+    fi\n\
+done\n\
+\n\
+# Aguardar dependências (se necessário)\n\
+sleep 5\n\
+\n\
+# Iniciar o serviço\n\
 if python3 -c "import uvloop" 2>/dev/null; then\n\
-    exec uvicorn app:app --host 0.0.0.0 --port 8000 --workers 1 --loop uvloop --http httptools\n\
+    exec python3 -m uvicorn app:app \\\n\
+        --host 0.0.0.0 \\\n\
+        --port 8000 \\\n\
+        --workers 1 \\\n\
+        --loop uvloop \\\n\
+        --http httptools \\\n\
+        --timeout-keep-alive 120 \\\n\
+        --limit-concurrency 1000 \\\n\
+        --log-level info\n\
 else\n\
-    exec uvicorn app:app --host 0.0.0.0 --port 8000 --workers 1\n\
+    exec python3 -m uvicorn app:app \\\n\
+        --host 0.0.0.0 \\\n\
+        --port 8000 \\\n\
+        --workers 1 \\\n\
+        --timeout-keep-alive 120 \\\n\
+        --limit-concurrency 1000 \\\n\
+        --log-level info\n\
 fi' > /entrypoint.sh && \
     chmod +x /entrypoint.sh && \
     chown ${USER_NAME}:${USER_NAME} /entrypoint.sh
