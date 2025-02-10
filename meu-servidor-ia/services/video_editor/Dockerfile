@@ -21,8 +21,8 @@ WORKDIR /build
 # Instalar torch primeiro
 RUN pip3 install --no-cache-dir torch==2.2.1 torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
 
-COPY meu-servidor-ia/requirements/video_editor.txt requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
+COPY meu-servidor-ia/services/video_editor/requirements.txt .
+RUN pip3 install --no-cache-dir -r requirements.txt
 
 # Runtime stage
 FROM nvidia/cuda:12.1.0-runtime-ubuntu22.04
@@ -39,6 +39,7 @@ RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 # Instalar dependências do sistema
 RUN apt-get update && apt-get install -y \
     python3.10 \
+    python3.10-dev \
     python3-pip \
     git \
     git-lfs \
@@ -48,19 +49,33 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-# Copiar dependências do build stage
-COPY --from=builder /usr/local/lib/python3.10/dist-packages /usr/local/lib/python3.10/dist-packages
+# Copiar requirements e instalar dependências Python
+COPY meu-servidor-ia/services/video_editor/requirements.txt .
+RUN pip3 install --no-cache-dir -r requirements.txt
 
-# Copiar arquivos do serviço
+# Copiar código do serviço
 COPY meu-servidor-ia/services/video_editor ./meu-servidor-ia/services/video_editor
 COPY meu-servidor-ia/shared ./meu-servidor-ia/shared
 
-# Criar diretório de modelos
-RUN mkdir -p /app/models
+# Criar diretórios necessários
+RUN mkdir -p /app/models /app/cache/videos /app/uploads/videos /app/logs
 
-# Script de inicialização
-COPY meu-servidor-ia/services/video_editor/entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+# Configurar permissões
+RUN chown -R nobody:nogroup /app && \
+    chmod -R 755 /app/models /app/cache /app/uploads /app/logs
+
+# Criar script de entrada
+RUN echo '#!/bin/bash\n\
+cd /app/meu-servidor-ia/services/video_editor\n\
+if python3 -c "import uvloop" 2>/dev/null; then\n\
+    exec python3 -m uvicorn app:app --host 0.0.0.0 --port 8000 --workers 1 --loop uvloop --http httptools\n\
+else\n\
+    exec python3 -m uvicorn app:app --host 0.0.0.0 --port 8000 --workers 1\n\
+fi' > /entrypoint.sh \
+    && chmod +x /entrypoint.sh
+
+# Mudar para usuário não-root
+USER nobody
 
 # Healthcheck
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
@@ -68,4 +83,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 
 EXPOSE 8000
 
-ENTRYPOINT ["/entrypoint.sh"] 
+ENTRYPOINT ["/entrypoint.sh"]

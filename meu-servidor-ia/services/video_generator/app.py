@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 
-from .routers import video
+import routers.video as video_router
 from .config import API_CONFIG
 from .pipeline import VideoPipeline
 
@@ -17,18 +17,18 @@ logger = logging.getLogger(__name__)
 
 # Inicializa FastAPI
 app = FastAPI(
-    title="Serviço de Geração de Vídeo",
-    description="API para geração e edição de vídeos",
+    title="Video Generator API",
+    description="API para geração de vídeos usando modelos de IA",
     version="1.0.0"
 )
 
-# Configuração CORS
+# Configurar CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=API_CONFIG["cors_origins"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"]
+    allow_headers=["*"],
 )
 
 # Handlers de exceção globais
@@ -60,8 +60,8 @@ async def general_exception_handler(request: Request, exc: Exception):
         content={"detail": "Erro interno do servidor"}
     )
 
-# Inclui routers
-app.include_router(video.router)  # Router específico para endpoints de vídeo
+# Incluir routers
+app.include_router(video_router.router, prefix="/api/v1", tags=["video"])
 
 # Eventos de lifecycle
 @app.on_event("startup")

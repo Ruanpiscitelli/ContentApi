@@ -16,9 +16,12 @@ x-common-settings: &common-settings
     - no-new-privileges:true
   read_only: true
   tmpfs:
-    - /tmp:exec,mode=777
+    - /tmp:exec,mode=1777
+    - /var/tmp:exec,mode=1777
   cap_drop:
     - ALL
+  cap_add:
+    - SYS_NICE
   depends_on:
     redis:
       condition: service_healthy
@@ -27,6 +30,12 @@ x-common-settings: &common-settings
     - 8.8.8.8
     - 8.8.4.4
   stop_grace_period: 30s
+  healthcheck:
+    test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+    interval: 30s
+    timeout: 10s
+    retries: 3
+    start_period: 30s
 
 # Variáveis de ambiente comuns
 x-common-env: &common-env
@@ -35,14 +44,9 @@ x-common-env: &common-env
   TORCH_CUDA_ARCH_LIST: "8.6"
   SKIP_MODEL_DOWNLOAD: "true"
   XFORMERS_ENABLE_FLASH_ATTENTION: "true"
-
-# Configuração padrão de healthcheck
-x-healthcheck: &default-healthcheck
-  test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-  interval: 30s
-  timeout: 10s
-  retries: 3
-  start_period: 60s
+  TZ: America/Sao_Paulo
+  PYTHONUNBUFFERED: "1"
+  DEBIAN_FRONTEND: noninteractive
 
 # Configuração padrão de recursos
 x-resources: &service-resources
@@ -61,16 +65,23 @@ services:
     build:
       context: .
       dockerfile: meu-servidor-ia/services/video_generator/Dockerfile
+      args:
+        PYTHON_VERSION: "3.10"
+        USER_NAME: appuser
+        USER_UID: 1000
+        USER_GID: 1000
     volumes:
       - ./models:/app/models:ro
-      - ./meu-servidor-ia/shared:/app/shared:ro
+      - ./logs:/app/logs
+      - ./cache:/app/cache
+      - ./uploads:/app/uploads
+      - ./temp:/app/temp
     environment:
       <<: *common-env
       NVIDIA_VISIBLE_DEVICES: "0"
       CUDA_VISIBLE_DEVICES: "0"
     ports:
       - "8001:8000"
-    healthcheck: *default-healthcheck
     deploy:
       resources: *service-resources
     runtime: nvidia
@@ -80,16 +91,23 @@ services:
     build:
       context: .
       dockerfile: meu-servidor-ia/services/image_generator/Dockerfile
+      args:
+        PYTHON_VERSION: "3.10"
+        USER_NAME: appuser
+        USER_UID: 1000
+        USER_GID: 1000
     volumes:
       - ./models:/app/models:ro
-      - ./meu-servidor-ia/shared:/app/shared:ro
+      - ./logs:/app/logs
+      - ./cache:/app/cache
+      - ./uploads:/app/uploads
+      - ./temp:/app/temp
     environment:
       <<: *common-env
       NVIDIA_VISIBLE_DEVICES: "1"
       CUDA_VISIBLE_DEVICES: "1"
     ports:
       - "8002:8000"
-    healthcheck: *default-healthcheck
     deploy:
       resources: *service-resources
     runtime: nvidia
@@ -99,16 +117,23 @@ services:
     build:
       context: .
       dockerfile: meu-servidor-ia/services/text_generation/Dockerfile
+      args:
+        PYTHON_VERSION: "3.10"
+        USER_NAME: appuser
+        USER_UID: 1000
+        USER_GID: 1000
     volumes:
       - ./models:/app/models:ro
-      - ./meu-servidor-ia/shared:/app/shared:ro
+      - ./logs:/app/logs
+      - ./cache:/app/cache
+      - ./uploads:/app/uploads
+      - ./temp:/app/temp
     environment:
       <<: *common-env
       NVIDIA_VISIBLE_DEVICES: "2"
       CUDA_VISIBLE_DEVICES: "2"
     ports:
       - "8003:8000"
-    healthcheck: *default-healthcheck
     deploy:
       resources: *service-resources
     runtime: nvidia
@@ -118,16 +143,23 @@ services:
     build:
       context: .
       dockerfile: meu-servidor-ia/services/voice_generator/Dockerfile
+      args:
+        PYTHON_VERSION: "3.10"
+        USER_NAME: appuser
+        USER_UID: 1000
+        USER_GID: 1000
     volumes:
       - ./models:/app/models:ro
-      - ./meu-servidor-ia/shared:/app/shared:ro
+      - ./logs:/app/logs
+      - ./cache:/app/cache
+      - ./uploads:/app/uploads
+      - ./temp:/app/temp
     environment:
       <<: *common-env
       NVIDIA_VISIBLE_DEVICES: "3"
       CUDA_VISIBLE_DEVICES: "3"
     ports:
       - "8004:8000"
-    healthcheck: *default-healthcheck
     deploy:
       resources: *service-resources
     runtime: nvidia
@@ -137,6 +169,11 @@ services:
     build:
       context: .
       dockerfile: meu-servidor-ia/services/video_editor/Dockerfile
+      args:
+        PYTHON_VERSION: "3.10"
+        USER_NAME: appuser
+        USER_UID: 1000
+        USER_GID: 1000
     volumes:
       - ./models:/app/models:ro
       - ./meu-servidor-ia/shared:/app/shared:ro
@@ -144,11 +181,10 @@ services:
       - ./logs/editor:/app/logs
     environment:
       <<: *common-env
-      NVIDIA_VISIBLE_DEVICES: "3"  # Compartilhando GPU com voice-generator
+      NVIDIA_VISIBLE_DEVICES: "3"
       CUDA_VISIBLE_DEVICES: "3"
     ports:
       - "8005:8000"
-    healthcheck: *default-healthcheck
     deploy:
       resources: *service-resources
     runtime: nvidia
@@ -179,24 +215,32 @@ services:
           memory: 1G
     cap_add:
       - IPC_LOCK
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
 
   dashboard:
     <<: *common-settings
     build:
       context: .
       dockerfile: meu-servidor-ia/services/dashboard/Dockerfile
+      args:
+        PYTHON_VERSION: "3.10"
+        USER_NAME: appuser
+        USER_UID: 1000
+        USER_GID: 1000
     ports:
       - "8000:8000"
     environment:
-      - API_HOST=0.0.0.0
-      - API_PORT=8000
+      <<: *common-env
+      API_HOST: 0.0.0.0
+      API_PORT: 8000
     depends_on:
       - video-generator
       - image-generator
       - text-generation
       - voice-generator
       - video-editor
-    healthcheck: *default-healthcheck
 
 networks:
   default:

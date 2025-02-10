@@ -1,42 +1,88 @@
-# Diretórios de modelos e cache
-models/
-.cache/
-**/cache/
-**/models/
-**/__pycache__/
-
-# Arquivos temporários
-*.pyc
-*.pyo
-*.pyd
+# Diretórios de desenvolvimento
+**/__pycache__
+**/*.py[cod]
+**/*.so
+**/*.egg
+**/*.egg-info
+dist
+build
+eggs
+parts
+bin
+var
+sdist
+develop-eggs
+.installed.cfg
+lib
+lib64
 .Python
-*.so
 
 # Ambientes virtuais
+.env
+.venv
 env/
 venv/
-.env/
-.venv/
+ENV/
 
-# Logs e dados
+# Diretórios de cache e modelos
+models/*
+!models/README.md
+.cache
+**/.cache
+**/cache
+**/__pycache__
+
+# Logs e dados temporários
 logs/
 *.log
 data/
+temp/
+tmp/
 
-# Git e outros
-.git/
+# Arquivos de controle de versão
+.git
 .gitignore
-.github/
-.pytest_cache/
-.coverage
+.gitattributes
+.github
+.gitlab-ci.yml
+.travis.yml
+.circleci
 
-# IDEs
+# IDEs e editores
 .idea/
 .vscode/
 *.swp
 *.swo
+*~
+.project
+.settings
+.classpath
+*.sublime-project
+*.sublime-workspace
 
-# Arquivos grandes e backups
+# Arquivos de teste e documentação
+tests/
+test/
+docs/
+*.md
+!README.md
+LICENSE
+CHANGELOG.md
+CONTRIBUTING.md
+
+# Arquivos de configuração
+.env*
+.flake8
+.pylintrc
+.coverage
+.pytest_cache/
+pytest.ini
+tox.ini
+mypy.ini
+setup.cfg
+setup.py
+
+# Arquivos grandes e binários
 *.tar
 *.gz
 *.zip
@@ -48,32 +94,32 @@ data/
 *.onnx
 *.safetensors
 *.bin
+*.h5
+*.hdf5
+*.pkl
+*.npz
+*.npy
 
-# Documentação
-docs/
-*.md
-LICENSE
-
-# Docker
+# Arquivos específicos do Docker
 .docker/
 docker-compose*.yml
 Dockerfile*
+.dockerignore
 
-# Exceto arquivos necessários
+# Arquivos do sistema
+.DS_Store
+Thumbs.db
+
+# Excluir tudo por padrão
+*
+
+# Incluir explicitamente apenas o necessário
+!meu-servidor-ia/services/*/requirements.txt
+!meu-servidor-ia/services/*/app.py
+!meu-servidor-ia/services/*/config.py
+!meu-servidor-ia/services/*/entrypoint.sh
+!meu-servidor-ia/services/*/routers/**
+!meu-servidor-ia/services/*/utils/**
+!meu-servidor-ia/shared/**
 !requirements.txt
-!download_models.py
-!services/*/requirements.txt
-!services/*/app.py
-!services/*/config.py
-!services/*/entrypoint.sh
-!shared/**
-
-env
-pip-log.txt
-pip-delete-this-directory.txt
-.tox
-.coverage.*
-nosetests.xml
-coverage.xml
-*.cover
-.DS_Store 
+!requirements/*.txt 
