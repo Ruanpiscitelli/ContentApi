@@ -12,7 +12,7 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 # Copiar requirements e instalar dependências Python
-COPY services/image_generator/requirements.txt .
+COPY ./requirements.txt .
 RUN pip3 install --no-cache-dir -r requirements.txt
 
 # Runtime stage
@@ -27,8 +27,8 @@ WORKDIR /app
 COPY --from=builder /usr/local/lib/python3.10/site-packages /usr/local/lib/python3.10/site-packages
 
 # Copiar código do serviço
-COPY services/image_generator ./services/image_generator
-COPY shared ./shared
+COPY . ./meu-servidor-ia/services/image_generator
+COPY ../shared ./meu-servidor-ia/shared
 
 # Criar diretórios necessários
 RUN mkdir -p /app/models /app/cache/images /app/uploads/images /app/logs && \

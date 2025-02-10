@@ -80,8 +80,8 @@ services:
   image-generator:
     <<: *common-settings
     build:
-      context: .
-      dockerfile: meu-servidor-ia/services/image_generator/Dockerfile
+      context: ./meu-servidor-ia
+      dockerfile: services/image_generator/Dockerfile
       args:
         PYTHON_VERSION: "3.10"
         USER_NAME: appuser
