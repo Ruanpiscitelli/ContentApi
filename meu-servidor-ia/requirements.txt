@@ -21,7 +21,6 @@ python-jose[cryptography]==3.3.0
 cryptography==41.0.1
 
 # Dependências para garantir compatibilidade
-starlette>=0.27.0,<0.28.0
 typing-extensions>=4.5.0
 
 # Dependências adicionais para o uvicorn
