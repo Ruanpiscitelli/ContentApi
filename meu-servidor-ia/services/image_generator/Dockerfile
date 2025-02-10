@@ -43,7 +43,10 @@ ENV PYTHONUNBUFFERED=1
 # Instalar runtime dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3.10 \
+    python3.10-dev \
     python3-pip \
+    python3.10-venv \
+    git \
     curl \
     libgomp1 \
     && curl -fsSL https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.1-1_all.deb -o cuda-keyring.deb \
@@ -63,28 +66,36 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# Copiar pacotes Python instalados do builder
-COPY --from=builder /usr/local/lib/python3.10/dist-packages /usr/local/lib/python3.10/dist-packages
+# Criar usuário não-root
+RUN groupadd -r appuser && useradd -r -g appuser -s /sbin/nologin appuser
+
+# Copiar requirements e instalar dependências Python
+COPY meu-servidor-ia/services/image_generator/requirements.txt .
+RUN pip3 install --no-cache-dir -r requirements.txt
 
 # Copiar código do serviço
 COPY meu-servidor-ia/services/image_generator ./meu-servidor-ia/services/image_generator
 COPY meu-servidor-ia/shared ./meu-servidor-ia/shared
 
 # Criar diretórios necessários
-RUN mkdir -p /app/models /app/cache/images /app/uploads/images
+RUN mkdir -p /app/models /app/cache/images /app/uploads/images /app/logs
 
 # Configurar permissões
-RUN chmod -R 755 /app/models /app/cache /app/uploads
+RUN chown -R appuser:appuser /app && \
+    chmod -R 755 /app/models /app/cache /app/uploads /app/logs
 
 # Criar e configurar script de entrada
 RUN echo '#!/bin/bash\n\
 cd /app/meu-servidor-ia/services/image_generator\n\
-if python -c "import uvloop" 2>/dev/null; then\n\
-    exec uvicorn app:app --host 0.0.0.0 --port 8000 --workers 1 --loop uvloop --http httptools\n\
+if python3 -c "import uvloop" 2>/dev/null; then\n\
+    exec python3 -m uvicorn app:app --host 0.0.0.0 --port 8000 --workers 1 --loop uvloop --http httptools\n\
 else\n\
-    exec uvicorn app:app --host 0.0.0.0 --port 8000 --workers 1\n\
+    exec python3 -m uvicorn app:app --host 0.0.0.0 --port 8000 --workers 1\n\
 fi' > /entrypoint.sh \
     && chmod +x /entrypoint.sh
+
+# Mudar para usuário não-root
+USER appuser
 
 # Configurar health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
@@ -94,4 +105,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 EXPOSE 8000
 
 # Definir ponto de entrada
-ENTRYPOINT ["/entrypoint.sh"] 
+ENTRYPOINT ["/entrypoint.sh"]
