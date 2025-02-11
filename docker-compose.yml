@@ -65,16 +65,11 @@ services:
       dockerfile: services/video_generator/Dockerfile
     volumes:
       - ./models:/app/models:ro
-      - ./logs:/app/logs
+      - ./storage:/app/storage
+      - ./logs/video:/app/logs
       - ./cache:/app/cache
-      - ./uploads:/app/uploads
-      - ./temp:/app/temp
-    environment:
-      - PYTHONPATH=/app
-      - PYTHONUNBUFFERED=1
-      - NVIDIA_VISIBLE_DEVICES=0
     ports:
-      - "8001:8000"
+      - "8003:8000"
     deploy:
       resources:
         reservations:
@@ -82,13 +77,18 @@ services:
             - driver: nvidia
               count: 1
               capabilities: [gpu]
-    depends_on:
-      - base
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=0
+      - CUDA_VISIBLE_DEVICES=0
+      - PYTHONPATH=/app
+      - PYTHONUNBUFFERED=1
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
+    depends_on:
+      - base
 
   image-generator:
     <<: *common-settings
