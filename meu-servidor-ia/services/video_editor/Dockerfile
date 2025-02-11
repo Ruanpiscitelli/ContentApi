@@ -5,12 +5,12 @@ ENV PYTHONPATH=/app
 ENV USER_NAME=appuser
 
 # Copiar e instalar requirements específicos
-COPY ./services/video_editor/requirements.txt .
+COPY --chown=appuser:appuser services/video-editor/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copiar código específico do serviço e código compartilhado
-COPY --chown=appuser:appuser ./services/video_editor /app/services/video_editor
-COPY --chown=appuser:appuser ./shared /app/shared
+COPY --chown=appuser:appuser services/video-editor ./services/video-editor
+COPY --chown=appuser:appuser shared ./shared
 
 # Criar diretórios específicos
 RUN mkdir -p /app/cache/videos && \
