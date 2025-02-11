@@ -84,3 +84,7 @@ async def health_check():
         "status": "healthy",
         "version": "1.0.0"
     }
+
+@app.get("/")
+async def root():
+    return {"message": "Video Generator Service"}

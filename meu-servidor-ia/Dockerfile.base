@@ -3,25 +3,30 @@ FROM python:3.10-slim
 
 # Evitar prompts durante a instalação
 ENV DEBIAN_FRONTEND=noninteractive
+ENV PYTHONUNBUFFERED=1
+ENV PIP_NO_CACHE_DIR=1
 
 # Instalar dependências do sistema
 RUN apt-get update && apt-get install -y \
     build-essential \
     curl \
     git \
+    ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
 # Diretório de trabalho
 WORKDIR /app
 
-# Copiar requirements primeiro para aproveitar cache
-COPY requirements.txt .
+# Criar usuário não-root
+RUN groupadd -g 1000 appuser && \
+    useradd -m -u 1000 -g appuser appuser && \
+    mkdir -p /app/{data,logs,uploads,cache,temp,models} && \
+    chown -R appuser:appuser /app
+
+# Copiar requirements base
+COPY --chown=appuser:appuser requirements.txt .
 
 # Instalar dependências Python
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copiar o resto do código
-COPY . .
-
-# Comando padrão
-CMD ["python", "app.py"]
+USER appuser
