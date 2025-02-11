@@ -1,9 +1,9 @@
 services:
   # Serviço de Geração de Imagens
   image-generator:
-    build: 
-      context: ./services/image_generator
-      dockerfile: Dockerfile
+    build:
+      context: .
+      dockerfile: services/image_generator/Dockerfile
     env_file: .env
     volumes:
       - ./models:/app/models:ro
@@ -32,8 +32,8 @@ services:
   # Serviço de Geração de Voz
   voice-generator:
     build:
-      context: ./services/voice_generator
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: services/voice_generator/Dockerfile
     env_file: .env
     volumes:
       - ./models:/app/models:ro
@@ -62,8 +62,8 @@ services:
   # Serviço de Geração de Vídeo
   video-generator:
     build:
-      context: ./services/video_generator
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: services/video_generator/Dockerfile
     env_file: .env
     volumes:
       - ./models:/app/models:ro
@@ -93,7 +93,7 @@ services:
   video-editor:
     build:
       context: .
-      dockerfile: ./services/video_editor/Dockerfile
+      dockerfile: services/video_editor/Dockerfile
     env_file: .env
     volumes:
       - ./models:/app/models:ro
