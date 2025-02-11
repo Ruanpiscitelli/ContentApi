@@ -22,7 +22,7 @@ WORKDIR /build
 RUN pip3 install --no-cache-dir torch==2.2.1 torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
 
 # Copiar e instalar requirements
-COPY services/video_generator/requirements.txt .
+COPY ./services/video_generator/requirements.txt .
 RUN pip3 install --no-cache-dir -r requirements.txt
 
 # Runtime stage
@@ -52,8 +52,8 @@ WORKDIR /app
 COPY --from=builder /usr/local/lib/python3.10/dist-packages /usr/local/lib/python3.10/dist-packages
 
 # Copiar código da aplicação
-COPY --chown=appuser:appuser services/video_generator /app/services/video_generator
-COPY --chown=appuser:appuser shared /app/shared
+COPY --chown=appuser:appuser ./services/video_generator /app/services/video_generator
+COPY --chown=appuser:appuser ./shared /app/shared
 
 USER appuser
 
