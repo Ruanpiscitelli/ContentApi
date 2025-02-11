@@ -2,6 +2,12 @@
 **/*.pyc
 **/*.pyo
 **/*.pyd
+.git
+.env
+.venv
+venv/
+.idea/
+.vscode/
 .Python
 env/
 build/

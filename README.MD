@@ -292,4 +292,4 @@ ls -la models/*
 docker-compose build --no-cache
 
 # 6. Iniciar os serviços
-docker-compose up
+docker-compose uplcd
