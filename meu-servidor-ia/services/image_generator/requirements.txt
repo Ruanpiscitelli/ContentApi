@@ -1,27 +1,27 @@
 # Dependências principais
-fastapi>=0.68.0
-uvicorn[standard]>=0.15.0
-python-multipart>=0.0.5
+fastapi>=0.68.0,<0.69.0
+uvicorn>=0.15.0,<0.16.0
+python-multipart>=0.0.5,<0.1.0
 pydantic>=1.8.0
 starlette>=0.14.2
 
 # IA e Processamento de Imagens
-torch>=2.0.0
+torch==2.2.1
 torchvision>=0.15.0
 diffusers>=0.25.0
-transformers>=4.30.0
+transformers>=4.36.0
 accelerate>=0.20.0
 safetensors>=0.3.0
 controlnet-aux>=0.0.6
 
 # Processamento de imagem
-Pillow>=9.0.0
+Pillow>=10.0.0
 numpy>=1.24.0
 opencv-python>=4.7.0
 scikit-image>=0.19.0
 
 # Cache e otimização
-redis>=4.0.0
+redis==5.0.1
 cachetools>=5.0.0
 msgpack>=1.0.0
 lz4>=4.0.0
@@ -45,5 +45,5 @@ python-dotenv>=0.19.0
 httpx>=0.23.0
 tenacity>=8.0.0
 uuid>=1.30
-python-jose[cryptography]>=3.3.0
+python-jose==3.3.0
 orjson>=3.6.0

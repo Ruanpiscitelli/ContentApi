@@ -1,23 +1,23 @@
 # Dependências principais
-fastapi>=0.68.0
-uvicorn>=0.15.0
+fastapi>=0.68.0,<0.69.0
+uvicorn>=0.15.0,<0.16.0
 uvloop>=0.19.0
 httptools>=0.6.1
 pydantic>=1.8.0
 vllm>=0.2.0
-torch>=2.0.0
-transformers>=4.30.0
+torch==2.2.1
+transformers>=4.36.0
 langchain>=0.1.0
 langchain_community>=0.0.10
 
 # Segurança
-python-jose>=3.3.0
+python-jose==3.3.0
 passlib>=1.7.4
 bcrypt>=3.2.0
-python-multipart>=0.0.5
+python-multipart>=0.0.5,<0.1.0
 
 # Cache e otimização
-redis>=4.0.0
+redis==5.0.1
 cachetools>=5.0.0
 msgpack>=1.0.3
 lz4>=4.0.0
@@ -31,7 +31,12 @@ python-json-logger>=2.0.0
 rich>=10.0.0
 
 # Utilitários
-python-dotenv>=0.19.0
+python-dotenv==1.0.1
 httpx>=0.23.0
 tenacity>=8.0.0
 orjson>=3.6.0
+
+# Adicionais
+accelerate>=0.27.0
+requests==2.31.0
+aiofiles==23.2.1

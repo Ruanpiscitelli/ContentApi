@@ -1,91 +1,65 @@
-# Stage 1: Builder
+# Build stage
 FROM nvidia/cuda:12.1.0-devel-ubuntu22.04 AS builder
 
-# Evitar interações durante a instalação
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
-ENV CUDA_HOME=/usr/local/cuda
-ENV PATH=${CUDA_HOME}/bin:${PATH}
-ENV LD_LIBRARY_PATH=${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}
+ENV PIP_NO_CACHE_DIR=1
 
-# Instalar dependências essenciais
+# Instalar dependências do sistema
 RUN apt-get update && apt-get install -y \
     python3.10 \
     python3.10-dev \
     python3-pip \
-    git \
     build-essential \
     curl \
-    software-properties-common \
+    git \
     && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /app
+WORKDIR /build
 
-# Instalar PyTorch com CUDA
+# Instalar torch primeiro
 RUN pip3 install --no-cache-dir torch==2.2.1 torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
 
-# Copiar requirements e instalar dependências Python
-COPY meu-servidor-ia/services/text_generation/requirements.txt .
+# Copiar e instalar requirements
+COPY ./services/text_generation/requirements.txt .
 RUN pip3 install --no-cache-dir -r requirements.txt
 
-# Stage 2: Runtime
+# Runtime stage
 FROM nvidia/cuda:12.1.0-runtime-ubuntu22.04
 
-# Configurações de ambiente
-ENV TZ=America/Sao_Paulo
-ENV PYTHONPATH=/app
-ENV CUDA_HOME=/usr/local/cuda
-ENV PATH=${CUDA_HOME}/bin:${PATH}
-ENV LD_LIBRARY_PATH=${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
+ENV PYTHONPATH=/app
 
-# Instalar runtime dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Instalar runtime deps
+RUN apt-get update && apt-get install -y \
     python3.10 \
     python3-pip \
     curl \
-    libgomp1 \
-    && curl -fsSL https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.1-1_all.deb -o cuda-keyring.deb \
-    && dpkg -i cuda-keyring.deb \
-    && apt-get update \
-    && apt-get install -y --no-install-recommends \
-        cuda-cudart-12-1 \
-        cuda-nvrtc-12-1 \
-        cuda-nvtx-12-1 \
-        libnvinfer8 \
-        libnvonnxparsers8 \
-        libnvparsers8 \
-        libnvinfer-plugin8 \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/* \
-    && rm cuda-keyring.deb
+    && rm -rf /var/lib/apt/lists/*
+
+# Criar usuário não-root
+RUN groupadd -g 1000 appuser && \
+    useradd -m -u 1000 -g appuser appuser && \
+    mkdir -p /app/{data,logs,uploads,cache,temp,models} && \
+    chown -R appuser:appuser /app
 
 WORKDIR /app
 
-# Copiar pacotes Python instalados do builder
+# Copiar pacotes Python do builder
 COPY --from=builder /usr/local/lib/python3.10/dist-packages /usr/local/lib/python3.10/dist-packages
 
-# Copiar código do serviço
-COPY meu-servidor-ia/services/text_generation ./meu-servidor-ia/services/text_generation
-COPY meu-servidor-ia/shared ./meu-servidor-ia/shared
+# Copiar código da aplicação
+COPY --chown=appuser:appuser ./services/text_generation /app/services/text_generation
+COPY --chown=appuser:appuser ./shared /app/shared
 
-# Criar diretórios necessários
-RUN mkdir -p /app/models /app/cache/text /app/uploads/text
+USER appuser
 
-# Configurar permissões
-RUN chmod -R 755 /app/models /app/cache /app/uploads
+WORKDIR /app/services/text_generation
 
-# Copiar e configurar script de entrada
-COPY meu-servidor-ia/services/text_generation/run.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
-
-# Configurar health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8001/health || exit 1
+    CMD curl -f http://localhost:8000/health || exit 1
 
-# Expor porta do serviço
-EXPOSE 8001
+EXPOSE 8000
 
-# Definir ponto de entrada
-ENTRYPOINT ["/entrypoint.sh"]
+CMD ["python3", "-m", "uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]

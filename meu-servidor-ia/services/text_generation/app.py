@@ -12,6 +12,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from prometheus_client import start_http_server
 from vllm import SamplingParams
+from pydantic import BaseModel
+import torch
+from transformers import pipeline
 
 from config import API_CONFIG, MODEL_CONFIG
 from schemas import (
@@ -65,6 +68,11 @@ model_manager = ModelManager(resource_manager)
 # Inclui routers
 app.include_router(text.router)
 
+class TextRequest(BaseModel):
+    prompt: str
+    max_length: int = 100
+    temperature: float = 0.7
+
 @app.on_event("startup")
 async def startup():
     """Inicializa serviço."""
@@ -90,6 +98,10 @@ async def health_check():
         "status": "healthy",
         "version": "1.0.0"
     }
+
+@app.get("/")
+async def root():
+    return {"message": "Text Generation Service"}
 
 @app.get("/v1/models")
 async def list_models(
@@ -480,6 +492,19 @@ async def call_function(
         Resultado da função
     """
     return await function_caller.call_function(name, arguments)
+
+@app.post("/generate")
+async def generate_text(request: TextRequest):
+    try:
+        generator = pipeline('text-generation', model='gpt2')
+        result = generator(
+            request.prompt,
+            max_length=request.max_length,
+            temperature=request.temperature
+        )
+        return {"generated_text": result[0]['generated_text']}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     import uvicorn

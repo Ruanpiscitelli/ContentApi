@@ -54,17 +54,17 @@ download_model() {
 }
 
 # Criar estrutura de diretórios
-mkdir -p models/{texto,imagem,voz,video}
+mkdir -p models/{text,image,voice,video}
 
 echo -e "${GREEN}Estrutura de diretórios criada${NC}"
 
 # Lista de modelos para download
 declare -a models=(
-    "texto/MiniCPM-o-2_6:openbmb/MiniCPM-o-2_6"
-    "texto/DeepSeek-R1-Distill-Qwen-32B-abliterated:huihui-ai/DeepSeek-R1-Distill-Qwen-32B-abliterated"
-    "imagem/animagine-xl-4.0:cagliostrolab/animagine-xl-4.0"
-    "imagem/ultimate-realistic-mix-v2-sdxl:John6666/ultimate-realistic-mix-v2-sdxl"
-    "voz/fish-speech-1.5:fish-speech-1.5"
+    "text/MiniCPM-o-2_6:openbmb/MiniCPM-o-2_6"
+    "text/DeepSeek-R1-Distill-Qwen-32B-abliterated:huihui-ai/DeepSeek-R1-Distill-Qwen-32B-abliterated"
+    "image/animagine-xl-4.0:cagliostrolab/animagine-xl-4.0"
+    "image/ultimate-realistic-mix-v2-sdxl:John6666/ultimate-realistic-mix-v2-sdxl"
+    "voice/fish-speech-1.5:fish-speech-1.5"
     "video/FastHunyuan:FastVideo/FastHunyuan-diffusers"
 )
 
@@ -147,4 +147,13 @@ for model in "${models[@]}"; do
     esac
 done
 
-echo -e "${GREEN}Processo de download concluído${NC}" 
+echo -e "${GREEN}Processo de download concluído${NC}"
+
+# Text Generation
+python3 -c "from transformers import AutoModel; AutoModel.from_pretrained('gpt2', cache_dir='models/text')"
+
+# Image Generation
+python3 -c "from diffusers import StableDiffusionPipeline; StableDiffusionPipeline.from_pretrained('runwayml/stable-diffusion-v1-5', cache_dir='models/image')"
+
+# Voice Generation
+python3 -c "from transformers import AutoModel; AutoModel.from_pretrained('facebook/fastspeech2-en-ljspeech', cache_dir='models/voice')" 

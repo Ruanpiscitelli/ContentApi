@@ -1,23 +1,22 @@
 # FastAPI e dependências
-fastapi>=0.68.0
-uvicorn[standard]>=0.15.0
-uvloop>=0.19.0
-httptools>=0.6.1
-python-multipart>=0.0.5
-pydantic>=1.8.2
+fastapi>=0.68.0,<0.69.0
+uvicorn>=0.15.0,<0.16.0
+python-multipart>=0.0.5,<0.1.0
+torch==2.2.1
+torchaudio==2.2.1
+transformers>=4.36.0
+python-jose==3.3.0
+redis==5.0.1
+soundfile>=0.12.1
 
 # Fish Speech e dependências
-torch>=2.0.0
-torchaudio>=2.0.0
 numpy>=1.21.0
 pydub>=0.25.1
 librosa>=0.9.0
-soundfile>=0.10.3
 huggingface-hub>=0.12.0
 
 # Clientes HTTP e cache
 aiohttp>=3.8.0
-redis>=4.3.0
 minio>=7.1.0
 cachetools>=5.0.0
 msgpack>=1.0.3
