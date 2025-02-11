@@ -12,7 +12,7 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 # Copiar requirements e instalar dependências
-COPY ./requirements.txt .
+COPY ./services/image_generator/requirements.txt .
 RUN pip3 install --no-cache-dir -r requirements.txt
 
 # Stage final
@@ -31,28 +31,24 @@ WORKDIR /app
 COPY --from=builder /usr/local/lib/python3.10/site-packages /usr/local/lib/python3.10/site-packages
 
 # Copiar código do serviço
-COPY . /app/
+COPY --chown=appuser:appuser ./services/image_generator /app/services/image_generator
+COPY --chown=appuser:appuser ./shared /app/shared
 
-# Criar diretórios necessários e ajustar permissões
+# Criar diretórios necessários
 RUN mkdir -p /app/models /app/storage /app/logs /app/cache && \
     chown -R appuser:appuser /app && \
     chmod -R 755 /app/models /app/storage /app/logs /app/cache
 
-# Mudar para usuário não-root
 USER appuser
 
-# Configurar variáveis de ambiente
-ENV PYTHONPATH=/app/services/image_generator
+ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
 
-# Mudar para o diretório do serviço
 WORKDIR /app/services/image_generator
 
-# Healthcheck com tempo maior de start
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
 EXPOSE 8000
 
-# Comando para iniciar o serviço
 CMD ["python3", "-m", "uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]

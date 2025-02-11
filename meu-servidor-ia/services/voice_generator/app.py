@@ -8,10 +8,11 @@ import asyncio
 from typing import Optional, Dict, Any
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.middleware.timeout import TimeoutMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel
+from starlette.middleware.base import BaseHTTPMiddleware
+from asyncio import TimeoutError
 
 # Importa módulos compartilhados
 from shared.config_base import BaseServiceConfig
@@ -54,10 +55,19 @@ app.add_middleware(
 )
 
 # Adiciona middleware de timeout
-app.add_middleware(
-    TimeoutMiddleware,
-    timeout=300  # 5 minutos
-)
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
+
+class TimeoutMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        start_time = time.time()
+        try:
+            return await call_next(request)
+        except TimeoutError:
+            return JSONResponse(
+                status_code=504,
+                content={"detail": "Request timeout"}
+            )
 
 # Handlers de exceção globais
 @app.exception_handler(RequestValidationError)

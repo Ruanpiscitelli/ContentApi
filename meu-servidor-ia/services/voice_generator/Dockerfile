@@ -25,7 +25,7 @@ COPY ./services/voice_generator/requirements.txt .
 RUN pip3 install --no-cache-dir -r requirements.txt
 
 # Runtime stage
-FROM nvidia/cuda:12.1.0-runtime-ubuntu22.04
+FROM nvidia/cuda:12.3.1-runtime-ubuntu22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
