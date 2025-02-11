@@ -1,37 +1,21 @@
 # Dependências principais
-fastapi>=0.68.0
-uvicorn>=0.15.0
+fastapi>=0.68.0,<0.69.0
+uvicorn[standard]>=0.15.0,<0.16.0
+python-multipart>=0.0.5,<0.1.0
 pydantic>=1.8.0
-python-multipart>=0.0.5
 
 # Processamento de vídeo
-ffmpeg-python>=0.2.0
 moviepy>=1.0.3
-opencv-python>=4.7.0
-numpy>=1.24.0
+opencv-python-headless>=4.8.0
+ffmpeg-python>=0.2.0
 
-# Cache e otimização
-redis>=4.0.0
-cachetools>=5.0.0
-msgpack>=1.0.0
-lz4>=4.0.0
-
-# Hardware e recursos
-psutil>=5.9.0
-py3nvml>=0.2.7
-torch>=2.0.0
+# IA e ML
+torch==2.2.1
 torchvision>=0.15.0
-
-# Storage
-minio>=7.1.0
-python-multipart>=0.0.5
-
-# Logging e monitoramento
-python-json-logger>=2.0.0
-rich>=10.0.0
+transformers>=4.36.0
 
 # Utilitários
 python-dotenv>=0.19.0
 httpx>=0.23.0
 tenacity>=8.0.0
-orjson>=3.6.0 
+orjson>=3.6.0

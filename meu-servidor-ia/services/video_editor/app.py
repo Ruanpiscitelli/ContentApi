@@ -47,10 +47,10 @@ app = FastAPI(
 # Adiciona CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings["cors"]["origins"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"]
+    allow_headers=["*"],
 )
 
 # Cliente MinIO
@@ -630,3 +630,7 @@ def upload_to_minio(file_bytes: bytes, bucket: str, file_name: str) -> str:
         return url
     except S3Error as err:
         raise RuntimeError(f"Erro no upload para o MinIO: {err}")
+
+@app.get("/")
+async def root():
+    return {"message": "Video Editor Service"}
