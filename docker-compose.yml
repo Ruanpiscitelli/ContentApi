@@ -142,8 +142,8 @@ services:
   video-editor:
     <<: *common-settings
     build:
-      context: .
-      dockerfile: meu-servidor-ia/services/video_editor/Dockerfile
+      context: ./meu-servidor-ia
+      dockerfile: services/video_editor/Dockerfile
     volumes:
       - ./cache:/app/cache
       - ./logs:/app/logs
