@@ -1,35 +1,39 @@
-# FastAPI e dependências
+# Dependências principais
 fastapi>=0.68.0,<0.69.0
-uvicorn>=0.15.0,<0.16.0
+uvicorn[standard]>=0.15.0,<0.16.0
 python-multipart>=0.0.5,<0.1.0
+pydantic>=1.8.0
+
+# IA e ML
 torch==2.2.1
 torchaudio==2.2.1
 transformers>=4.36.0
-python-jose==3.3.0
-redis==5.0.1
-soundfile>=0.12.1
-
-# Fish Speech e dependências
 numpy>=1.21.0
-pydub>=0.25.1
-librosa>=0.9.0
-huggingface-hub>=0.12.0
 
-# Clientes HTTP e cache
-aiohttp>=3.8.0
-minio>=7.1.0
+# Áudio
+soundfile>=0.12.1
+librosa>=0.9.0
+pydub>=0.25.1
+
+# Cache e otimização
+redis==5.0.1
 cachetools>=5.0.0
 msgpack>=1.0.3
-lz4>=4.0.0
 
-# Monitoramento e logging
+# Monitoramento
 prometheus-client>=0.14.0
-python-json-logger>=2.0.0
-rich>=10.0.0
 psutil>=5.9.0
 py3nvml>=0.2.7
 
+# Logging
+python-json-logger>=2.0.0
+rich>=10.0.0
+
+# Segurança
+python-jose==3.3.0
+
 # Utilitários
 python-dotenv>=0.19.0
-regex>=2022.3.15
-tenacity>=8.0.1
+httpx>=0.23.0
+tenacity>=8.0.0
+orjson>=3.6.0
