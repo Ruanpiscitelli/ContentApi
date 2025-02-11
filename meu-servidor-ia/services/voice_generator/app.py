@@ -54,20 +54,23 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
-# Adiciona middleware de timeout
-from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.requests import Request
-
+# Implementação do middleware de timeout personalizado
 class TimeoutMiddleware(BaseHTTPMiddleware):
+    def __init__(self, app, timeout=300):
+        super().__init__(app)
+        self.timeout = timeout
+
     async def dispatch(self, request: Request, call_next):
-        start_time = time.time()
         try:
-            return await call_next(request)
-        except TimeoutError:
+            return await asyncio.wait_for(call_next(request), timeout=self.timeout)
+        except asyncio.TimeoutError:
             return JSONResponse(
                 status_code=504,
                 content={"detail": "Request timeout"}
             )
+
+# Adiciona o middleware de timeout
+app.add_middleware(TimeoutMiddleware, timeout=300)  # 5 minutos
 
 # Handlers de exceção globais
 @app.exception_handler(RequestValidationError)

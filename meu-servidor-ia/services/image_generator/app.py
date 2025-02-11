@@ -17,6 +17,7 @@ from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
 from contextlib import asynccontextmanager
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from diffusers import (
     StableDiffusionPipeline,
@@ -1629,3 +1630,17 @@ async def general_exception_handler(request: Request, exc: Exception):
 
 # Inclui routers
 app.include_router(image.router)
+
+class TimeoutMiddleware(BaseHTTPMiddleware):
+    def __init__(self, app, timeout=300):
+        super().__init__(app)
+        self.timeout = timeout
+
+    async def dispatch(self, request: Request, call_next):
+        try:
+            return await asyncio.wait_for(call_next(request), timeout=self.timeout)
+        except asyncio.TimeoutError:
+            return JSONResponse(
+                status_code=504,
+                content={"detail": "Request timeout"}
+            )

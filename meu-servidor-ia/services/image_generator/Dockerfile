@@ -15,7 +15,7 @@ WORKDIR /app
 COPY ./services/image_generator/requirements.txt .
 RUN pip3 install --no-cache-dir -r requirements.txt
 
-# Stage final
+# Runtime stage
 FROM python:3.10-slim
 
 # Criar usuário não-root

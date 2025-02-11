@@ -24,6 +24,7 @@ from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel, Field
 from minio import Minio
 from minio.error import S3Error
+from fastapi.middleware.base import BaseHTTPMiddleware
 
 from .config import settings
 from .security import verify_bearer_token
@@ -634,3 +635,18 @@ def upload_to_minio(file_bytes: bytes, bucket: str, file_name: str) -> str:
 @app.get("/")
 async def root():
     return {"message": "Video Editor Service"}
+
+# Precisa implementar o mesmo TimeoutMiddleware
+class TimeoutMiddleware(BaseHTTPMiddleware):
+    def __init__(self, app, timeout=300):
+        super().__init__(app)
+        self.timeout = timeout
+
+    async def dispatch(self, request: Request, call_next):
+        try:
+            return await asyncio.wait_for(call_next(request), timeout=self.timeout)
+        except asyncio.TimeoutError:
+            return JSONResponse(
+                status_code=504,
+                content={"detail": "Request timeout"}
+            )

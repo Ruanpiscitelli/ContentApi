@@ -9,50 +9,37 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
+
+# Copiar e instalar requirements
 COPY ./services/video_editor/requirements.txt .
 RUN pip3 install --no-cache-dir -r requirements.txt
 
 # Runtime stage
 FROM python:3.10-slim
 
-# Definir variáveis de ambiente
-ENV PYTHONPATH=/app/services/video_editor
-ENV PYTHONUNBUFFERED=1
-ENV USER_NAME=appuser
-
-# Instalar dependências do sistema
-RUN apt-get update && \
+# Criar usuário não-root
+RUN groupadd -r appuser && useradd -r -g appuser -s /sbin/nologin appuser && \
+    apt-get update && \
     apt-get install -y --no-install-recommends \
-    build-essential \
-    python3-dev \
     curl \
-    git \
     && rm -rf /var/lib/apt/lists/*
 
-# Criar usuário não-root
-RUN useradd -m -u 1000 ${USER_NAME}
-
-# Configurar diretório de trabalho
 WORKDIR /app
 
-# Copiar arquivos do projeto
-COPY --chown=appuser:appuser . /app/
+# Copiar pacotes Python do builder
+COPY --from=builder /usr/local/lib/python3.10/site-packages /usr/local/lib/python3.10/site-packages
 
-# Criar diretórios e ajustar permissões
-RUN mkdir -p /app/cache /app/models /app/storage /app/logs && \
-    chown -R ${USER_NAME}:${USER_NAME} /app && \
-    chmod -R 755 /app/cache /app/models /app/storage /app/logs
+# Copiar código do serviço
+COPY --chown=appuser:appuser ./services/video_editor /app/services/video_editor
+COPY --chown=appuser:appuser ./shared /app/shared
 
-# Instalar dependências Python
-RUN pip install --no-cache-dir -r services/video_editor/requirements.txt
+USER appuser
 
-# Mudar para o diretório do serviço
+ENV PYTHONPATH=/app
+ENV PYTHONUNBUFFERED=1
+
 WORKDIR /app/services/video_editor
 
-# Mudar para usuário não-root
-USER ${USER_NAME}
-
-# Healthcheck com tempo maior de start
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
