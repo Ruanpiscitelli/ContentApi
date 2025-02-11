@@ -23,14 +23,15 @@ RUN useradd -m -u 1000 ${USER_NAME}
 WORKDIR /app
 
 # Copiar apenas os requirements primeiro
-COPY --chown=appuser:appuser services/dashboard/requirements.txt /app/requirements.txt
+COPY services/dashboard/requirements.txt /app/requirements.txt
 
-# Instalar dependências Python
-RUN pip install --no-cache-dir -r /app/requirements.txt
+# Atualizar pip e instalar dependências Python
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r /app/requirements.txt
 
 # Copiar o resto dos arquivos do projeto
-COPY --chown=appuser:appuser ./services/dashboard /app/services/dashboard
-COPY --chown=appuser:appuser ./shared /app/shared
+COPY ./services/dashboard /app/services/dashboard
+COPY ./shared /app/shared
 
 # Criar diretórios e ajustar permissões
 RUN mkdir -p /app/logs && \
