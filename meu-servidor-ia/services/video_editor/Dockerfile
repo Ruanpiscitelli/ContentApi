@@ -1,3 +1,18 @@
+# Build stage
+FROM python:3.10-slim as builder
+
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    python3-dev \
+    curl \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY ./services/video_editor/requirements.txt .
+RUN pip3 install --no-cache-dir -r requirements.txt
+
+# Runtime stage
 FROM python:3.10-slim
 
 # Definir variáveis de ambiente
