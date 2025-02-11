@@ -60,6 +60,7 @@ services:
     image: contentapi-base
 
   video-generator:
+    <<: [*common-settings, *gpu-settings]
     build:
       context: ./meu-servidor-ia
       dockerfile: services/video_generator/Dockerfile
@@ -70,79 +71,73 @@ services:
       - ./cache:/app/cache
     ports:
       - "8003:8000"
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
     environment:
       - NVIDIA_VISIBLE_DEVICES=0
       - CUDA_VISIBLE_DEVICES=0
       - PYTHONPATH=/app
       - PYTHONUNBUFFERED=1
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
     depends_on:
       - base
 
   image-generator:
-    <<: *common-settings
+    <<: [*common-settings, *gpu-settings]
     build:
       context: ./meu-servidor-ia
       dockerfile: services/image_generator/Dockerfile
-      args:
-        PYTHON_VERSION: "3.10"
-        USER_NAME: appuser
-        USER_UID: 1000
-        USER_GID: 1000
-    volumes: *common-volumes
-    environment:
-      <<: *common-env
-      NVIDIA_VISIBLE_DEVICES: "1"
-      CUDA_VISIBLE_DEVICES: "1"
+    volumes:
+      - ./models:/app/models:ro
+      - ./storage:/app/storage
+      - ./logs/image:/app/logs
+      - ./cache:/app/cache
     ports:
       - "8002:8000"
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=1
+      - CUDA_VISIBLE_DEVICES=1
+      - PYTHONPATH=/app
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      - base
 
   text-generation:
-    <<: *common-settings
+    <<: [*common-settings, *gpu-settings]
     build:
       context: ./meu-servidor-ia
       dockerfile: services/text_generation/Dockerfile
-      args:
-        PYTHON_VERSION: "3.10"
-        USER_NAME: appuser
-        USER_UID: 1000
-        USER_GID: 1000
-    volumes: *common-volumes
-    environment:
-      <<: *common-env
-      NVIDIA_VISIBLE_DEVICES: "2"
-      CUDA_VISIBLE_DEVICES: "2"
+    volumes:
+      - ./models:/app/models:ro
+      - ./storage:/app/storage
+      - ./logs/text:/app/logs
+      - ./cache:/app/cache
     ports:
-      - "8003:8000"
+      - "8004:8000"
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=2
+      - CUDA_VISIBLE_DEVICES=2
+      - PYTHONPATH=/app
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      - base
 
   voice-generator:
-    <<: *common-settings
+    <<: [*common-settings, *gpu-settings]
     build:
       context: ./meu-servidor-ia
       dockerfile: services/voice_generator/Dockerfile
-      args:
-        PYTHON_VERSION: "3.10"
-        USER_NAME: appuser
-        USER_UID: 1000
-        USER_GID: 1000
-    volumes: *common-volumes
-    environment:
-      <<: *common-env
-      NVIDIA_VISIBLE_DEVICES: "3"
-      CUDA_VISIBLE_DEVICES: "3"
+    volumes:
+      - ./models:/app/models:ro
+      - ./storage:/app/storage
+      - ./logs/voice:/app/logs
+      - ./cache:/app/cache
     ports:
-      - "8004:8000"
+      - "8005:8000"
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=3
+      - CUDA_VISIBLE_DEVICES=3
+      - PYTHONPATH=/app
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      - base
 
   video-editor:
     <<: *common-settings
