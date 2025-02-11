@@ -4,12 +4,17 @@ FROM python:3.10-slim
 ENV PYTHONPATH=/app
 ENV USER_NAME=appuser
 
+# Instalar dependências do sistema
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    build-essential \
+    python3-dev \
+    curl \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
 # Criar usuário não-root
-RUN useradd -m -u 1000 ${USER_NAME} && \
-    apt-get update && \
-    apt-get install -y --no-install-recommends curl && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+RUN useradd -m -u 1000 ${USER_NAME}
 
 # Configurar diretório de trabalho
 WORKDIR /app
@@ -17,11 +22,9 @@ WORKDIR /app
 # Copiar arquivos do projeto
 COPY --chown=appuser:appuser . /app/
 
-# Instalar dependências
-RUN pip install --no-cache-dir -r services/video_editor/requirements.txt
-
-# Criar diretórios específicos
-RUN mkdir -p /app/cache/videos && \
+# Instalar dependências Python
+RUN pip install --no-cache-dir -r services/video_editor/requirements.txt && \
+    mkdir -p /app/cache && \
     chown -R ${USER_NAME}:${USER_NAME} /app/cache
 
 # Mudar para o diretório do serviço

@@ -293,3 +293,7 @@ docker-compose build --no-cache
 
 # 6. Iniciar os serviços
 docker-compose uplcd
+
+
+
+./start-services.sh
