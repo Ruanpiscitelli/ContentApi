@@ -8,4 +8,4 @@ set -e
 echo "Iniciando o serviço de geração de voz..."
 # Inicia o servidor FastAPI usando uvicorn.
 # Ajuste o caminho 'meu-servidor-ia.services.voice_generator.main:app' conforme a localização da sua aplicação.
-uvicorn meu-servidor-ia.services.voice_generator.main:app --host 0.0.0.0 --port 8000
+exec python3 -m uvicorn meu-servidor-ia.services.voice_generator.main:app --host 0.0.0.0 --port 8000 --workers 1

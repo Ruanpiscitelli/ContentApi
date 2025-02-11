@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.timeout import TimeoutMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
+from pydantic import BaseModel
 
 # Importa módulos compartilhados
 from shared.config_base import BaseServiceConfig
@@ -111,3 +112,23 @@ async def health_check():
         "status": "healthy",
         "version": "1.0.0"
     }
+
+class VoiceRequest(BaseModel):
+    text: str
+    voice_id: str = "default"
+    language: str = "pt-BR"
+
+@app.get("/")
+async def root():
+    return {"message": "Voice Generator Service"}
+
+@app.post("/generate")
+async def generate_voice(request: VoiceRequest):
+    try:
+        # Implementação básica inicial
+        return {
+            "status": "success",
+            "message": f"Voice generation requested for text: {request.text[:30]}..."
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

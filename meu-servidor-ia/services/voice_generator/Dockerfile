@@ -1,104 +1,66 @@
 # Build stage
 FROM nvidia/cuda:12.1.0-devel-ubuntu22.04 AS builder
 
-# Build arguments
-ARG PYTHON_VERSION=3.10
-ARG DEBIAN_FRONTEND=noninteractive
-ARG TZ=America/Sao_Paulo
+ENV DEBIAN_FRONTEND=noninteractive
+ENV PYTHONUNBUFFERED=1
+ENV PIP_NO_CACHE_DIR=1
 
-# Configurações de ambiente para build
-ENV PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1 \
-    CUDA_HOME=/usr/local/cuda \
-    PATH=${CUDA_HOME}/bin:${PATH} \
-    LD_LIBRARY_PATH=${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}
-
-# Instalar dependências de build
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    python${PYTHON_VERSION} \
-    python${PYTHON_VERSION}-dev \
+# Instalar dependências do sistema
+RUN apt-get update && apt-get install -y \
+    python3.10 \
+    python3.10-dev \
     python3-pip \
     build-essential \
     curl \
     git \
-    libsndfile1-dev \
-    libportaudio2 \
-    portaudio19-dev \
-    ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /build
 
-# Instalar torch primeiro para otimizar cache
+# Instalar torch primeiro
 RUN pip3 install --no-cache-dir torch==2.2.1 torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
 
 # Copiar e instalar requirements
-COPY meu-servidor-ia/services/voice_generator/requirements.txt .
+COPY ./services/voice_generator/requirements.txt .
 RUN pip3 install --no-cache-dir -r requirements.txt
 
 # Runtime stage
 FROM nvidia/cuda:12.1.0-runtime-ubuntu22.04
 
-# Runtime arguments
-ARG PYTHON_VERSION=3.10
-ARG USER_NAME=appuser
-ARG USER_UID=1000
-ARG USER_GID=1000
+ENV DEBIAN_FRONTEND=noninteractive
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONPATH=/app
 
-# Configurações de ambiente para runtime
-ENV TZ=America/Sao_Paulo \
-    PYTHONPATH=/app \
-    DEBIAN_FRONTEND=noninteractive \
-    PYTHONUNBUFFERED=1 \
-    NVIDIA_VISIBLE_DEVICES=all \
-    CUDA_VISIBLE_DEVICES=all \
-    CUDA_HOME=/usr/local/cuda \
-    PATH=${CUDA_HOME}/bin:${PATH} \
-    LD_LIBRARY_PATH=${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}
-
-# Configurar timezone
-RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
-
-# Instalar dependências runtime
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    python${PYTHON_VERSION} \
+# Instalar runtime deps
+RUN apt-get update && apt-get install -y \
+    python3.10 \
     python3-pip \
-    ffmpeg \
-    libsndfile1 \
-    libportaudio2 \
-    portaudio19-dev \
     curl \
+    ffmpeg \
     && rm -rf /var/lib/apt/lists/*
+
+# Criar usuário não-root
+RUN groupadd -g 1000 appuser && \
+    useradd -m -u 1000 -g appuser appuser && \
+    mkdir -p /app/{data,logs,uploads,cache,temp,models} && \
+    chown -R appuser:appuser /app
 
 WORKDIR /app
 
-# Criar usuário não-root
-RUN groupadd -g ${USER_GID} ${USER_NAME} && \
-    useradd -u ${USER_UID} -g ${USER_GID} -s /bin/bash -m ${USER_NAME}
-
-# Criar diretórios necessários
-RUN mkdir -p /app/models /app/cache/voice /app/uploads/voice /app/logs && \
-    chown -R ${USER_NAME}:${USER_NAME} /app
-
 # Copiar pacotes Python do builder
-COPY --from=builder /usr/local/lib/python${PYTHON_VERSION}/dist-packages /usr/local/lib/python${PYTHON_VERSION}/dist-packages
+COPY --from=builder /usr/local/lib/python3.10/dist-packages /usr/local/lib/python3.10/dist-packages
 
-# Copiar código do serviço
-COPY --chown=${USER_NAME}:${USER_NAME} meu-servidor-ia/services/voice_generator /app/meu-servidor-ia/services/voice_generator/
-COPY --chown=${USER_NAME}:${USER_NAME} meu-servidor-ia/shared /app/meu-servidor-ia/shared/
+# Copiar código da aplicação
+COPY --chown=appuser:appuser ./services/voice_generator /app/services/voice_generator
+COPY --chown=appuser:appuser ./shared /app/shared
 
-# Copiar e configurar script de entrada
-COPY meu-servidor-ia/services/voice_generator/run.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh && \
-    chown ${USER_NAME}:${USER_NAME} /entrypoint.sh
+USER appuser
 
-# Mudar para usuário não-root
-USER ${USER_NAME}
+WORKDIR /app/services/voice_generator
 
-# Healthcheck mais robusto
-HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
 EXPOSE 8000
 
-ENTRYPOINT ["/entrypoint.sh"]
+CMD ["python3", "-m", "uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
