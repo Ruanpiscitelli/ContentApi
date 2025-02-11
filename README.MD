@@ -276,21 +276,20 @@ This README provides a comprehensive overview of the project, covering its featu
 
 
 
-# Limpar cache do Docker
-docker builder prune -f
-
-# Reconstruir
-docker-compose build --no-cache
-
-# Limpar tudo
+# 1. Primeiro, parar e remover todos os containers e volumes
 docker-compose down -v
+
+# 2. Limpar todo o sistema Docker
 docker system prune -af --volumes
 
-# Baixar modelos atualizados
+# 3. Executar o script de download dos modelos
 bash download_models.sh
 
-# Verificar estrutura
+# 4. Verificar se os modelos foram baixados corretamente
 ls -la models/*
 
-# Reconstruir e iniciar
-docker-compose up --build
+# 5. Reconstruir sem cache
+docker-compose build --no-cache
+
+# 6. Iniciar os serviços
+docker-compose up

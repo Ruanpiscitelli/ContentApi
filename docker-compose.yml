@@ -58,6 +58,10 @@ services:
       context: ./meu-servidor-ia
       dockerfile: Dockerfile.base
     image: contentapi-base
+    volumes:
+      - ./meu-servidor-ia:/app
+    environment:
+      - PYTHONUNBUFFERED=1
 
   video-generator:
     <<: [*common-settings, *gpu-settings]

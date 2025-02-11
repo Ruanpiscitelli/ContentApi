@@ -1,53 +1,27 @@
-FROM python:3.10-slim as builder
+# Imagem base
+FROM python:3.10-slim
 
-# Instalar dependências essenciais
+# Evitar prompts durante a instalação
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Instalar dependências do sistema
 RUN apt-get update && apt-get install -y \
     build-essential \
     curl \
+    git \
     && rm -rf /var/lib/apt/lists/*
 
-# Configurar pip
-ENV PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1 \
-    PIP_DEFAULT_TIMEOUT=100 \
-    PYTHONUNBUFFERED=1
-
+# Diretório de trabalho
 WORKDIR /app
 
-# Atualizar pip e instalar ferramentas
-RUN pip install --no-cache-dir --upgrade pip setuptools wheel
+# Copiar requirements primeiro para aproveitar cache
+COPY requirements.txt .
 
-# Copiar requirements.txt
-COPY requirements.txt /app/requirements.txt
+# Instalar dependências Python
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Runtime stage
-FROM python:3.10-slim
+# Copiar o resto do código
+COPY . .
 
-# Instalar runtime deps
-RUN apt-get update && apt-get install -y \
-    curl \
-    ffmpeg \
-    && rm -rf /var/lib/apt/lists/*
-
-# Criar usuário não-root
-RUN useradd -m -u 1000 appuser && \
-    mkdir -p /app/{data,logs,uploads,cache,temp,models} && \
-    chown -R appuser:appuser /app
-
-WORKDIR /app
-
-# Copiar pacotes Python do builder
-COPY --from=builder /usr/local/lib/python3.10/site-packages /usr/local/lib/python3.10/site-packages
-
-USER appuser
-
-ENV PYTHONPATH=/app \
-    PYTHONUNBUFFERED=1 \
-    TRANSFORMERS_CACHE=/app/cache/transformers \
-    HF_HOME=/app/cache/huggingface
-
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
-
-EXPOSE 8000
+# Comando padrão
+CMD ["python", "app.py"]
