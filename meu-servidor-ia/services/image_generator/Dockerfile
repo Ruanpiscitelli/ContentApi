@@ -33,21 +33,26 @@ COPY --from=builder /usr/local/lib/python3.10/site-packages /usr/local/lib/pytho
 # Copiar código do serviço
 COPY . /app/
 
-# Criar diretórios necessários
-RUN mkdir -p /app/models /app/storage /app/logs && \
-    chown -R appuser:appuser /app
+# Criar diretórios necessários e ajustar permissões
+RUN mkdir -p /app/models /app/storage /app/logs /app/cache && \
+    chown -R appuser:appuser /app && \
+    chmod -R 755 /app/models /app/storage /app/logs /app/cache
 
 # Mudar para usuário não-root
 USER appuser
 
 # Configurar variáveis de ambiente
-ENV PYTHONPATH=/app
+ENV PYTHONPATH=/app/services/image_generator
+ENV PYTHONUNBUFFERED=1
 
-# Healthcheck
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+# Mudar para o diretório do serviço
+WORKDIR /app/services/image_generator
+
+# Healthcheck com tempo maior de start
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
 EXPOSE 8000
 
 # Comando para iniciar o serviço
-CMD ["python3", "-m", "uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["python3", "-m", "uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
