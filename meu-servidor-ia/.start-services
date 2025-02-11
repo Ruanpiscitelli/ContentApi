@@ -1,0 +1,76 @@
+#!/bin/bash
+
+# Cores para output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+echo -e "${YELLOW}Iniciando serviços...${NC}"
+
+# Criar diretórios necessários
+echo -e "${GREEN}Criando diretórios...${NC}"
+mkdir -p logs/{image,voice,video,editor,dashboard}
+mkdir -p storage
+mkdir -p models
+
+# Verificar se o .env existe
+if [ ! -f .env ]; then
+    echo -e "${RED}Arquivo .env não encontrado. Criando um novo...${NC}"
+    cp .env.example .env || echo -e "${RED}Erro: .env.example não encontrado${NC}"
+fi
+
+# Parar todos os containers existentes
+echo -e "${YELLOW}Parando containers existentes...${NC}"
+docker-compose down
+
+# Limpar volumes não utilizados
+echo -e "${YELLOW}Limpando volumes não utilizados...${NC}"
+docker volume prune -f
+
+# Reconstruir imagens
+echo -e "${GREEN}Reconstruindo imagens...${NC}"
+docker-compose build --no-cache
+
+# Iniciar Redis primeiro
+echo -e "${GREEN}Iniciando Redis...${NC}"
+docker-compose up -d redis
+
+# Aguardar Redis estar saudável
+echo -e "${YELLOW}Aguardando Redis estar saudável...${NC}"
+while ! docker-compose exec redis redis-cli ping > /dev/null 2>&1; do
+    echo -n "."
+    sleep 1
+done
+echo -e "${GREEN}Redis está pronto!${NC}"
+
+# Iniciar serviços de IA
+echo -e "${GREEN}Iniciando serviços de IA...${NC}"
+docker-compose up -d image-generator voice-generator video-generator video-editor
+
+# Aguardar serviços de IA estarem saudáveis
+echo -e "${YELLOW}Aguardando serviços de IA...${NC}"
+for service in image-generator voice-generator video-generator video-editor; do
+    echo -n "Aguardando $service"
+    until curl -s http://localhost:$(docker-compose port $service 8000 | cut -d: -f2)/health > /dev/null; do
+        echo -n "."
+        sleep 2
+    done
+    echo -e "${GREEN}$service está pronto!${NC}"
+done
+
+# Iniciar dashboard por último
+echo -e "${GREEN}Iniciando dashboard...${NC}"
+docker-compose up -d dashboard
+
+echo -e "${GREEN}Todos os serviços iniciados!${NC}"
+echo -e "${YELLOW}Verificando status dos serviços...${NC}"
+docker-compose ps
+
+# Mostrar logs em caso de erro
+for service in $(docker-compose ps --services); do
+    if [ "$(docker-compose ps --services --filter "status=restarting" | grep $service)" ]; then
+        echo -e "${RED}Erro no serviço $service. Mostrando logs:${NC}"
+        docker-compose logs $service
+    fi
+done 
