@@ -1,3 +1,5 @@
+version: '3.8'
+
 services:
   # Serviço de Geração de Imagens
   image-generator:
@@ -29,7 +31,7 @@ services:
       start_period: 40s
     restart: unless-stopped
     networks:
-      - content_api_net
+      - ai_services_net
 
   # Serviço de Geração de Voz
   voice-generator:
@@ -61,7 +63,7 @@ services:
       start_period: 40s
     restart: unless-stopped
     networks:
-      - content_api_net
+      - ai_services_net
 
   # Serviço de Geração de Vídeo
   video-generator:
@@ -93,7 +95,7 @@ services:
       start_period: 40s
     restart: unless-stopped
     networks:
-      - content_api_net
+      - ai_services_net
 
   # Serviço de Edição de Vídeo
   video-editor:
@@ -125,7 +127,7 @@ services:
       start_period: 40s
     restart: unless-stopped
     networks:
-      - content_api_net
+      - ai_services_net
 
   # Serviço de Cache Redis
   redis:
@@ -142,7 +144,7 @@ services:
       retries: 3
     restart: unless-stopped
     networks:
-      - content_api_net
+      - ai_services_net
 
   dashboard:
     build:
@@ -176,18 +178,17 @@ services:
       start_period: 40s
     restart: unless-stopped
     networks:
-      - content_api_net
+      - ai_services_net
 
 volumes:
   redis-data:
     driver: local
 
 networks:
-  content_api_net:
-    name: content_api_network
+  ai_services_net:
     driver: bridge
     ipam:
       driver: default
       config:
-        - subnet: 172.40.0.0/16
-          gateway: 172.40.0.1
+        - subnet: 192.168.90.0/24
+          gateway: 192.168.90.1
