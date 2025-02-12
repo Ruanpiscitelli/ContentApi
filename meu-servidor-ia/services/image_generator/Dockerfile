@@ -1,54 +1,89 @@
 # Build stage
-FROM python:3.10-slim as builder
+FROM nvidia/cuda:12.3.1-devel-ubuntu22.04 as builder
 
-# Instalar dependências de sistema necessárias
+# Set environment variables
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    TORCH_CUDA_ARCH_LIST="7.5 8.0 8.6 8.9 9.0+PTX" \
+    TORCH_NVCC_FLAGS="-Xfatbin -compress-all" \
+    CMAKE_CUDA_ARCHITECTURES="75 80 86 89 90"
+
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
+    python3.10 \
+    python3-pip \
+    python3.10-dev \
     build-essential \
-    python3-dev \
-    curl \
+    cmake \
     git \
+    ninja-build \
+    pkg-config \
     && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /app
+# Set up build directory
+WORKDIR /build
 
-# Copiar requirements e instalar dependências
+# Install torch first with CUDA 12.1 support
+RUN pip3 install --no-cache-dir torch==2.2.1 torchvision==0.17.1 --index-url https://download.pytorch.org/whl/cu121
+
+# Install triton and xformers for optimizations
+RUN pip3 install --no-cache-dir triton==2.1.0 xformers==0.0.23
+
+# Copy and install remaining requirements
 COPY ./services/image_generator/requirements.txt .
 RUN pip3 install --no-cache-dir -r requirements.txt
 
 # Runtime stage
-FROM python:3.10-slim
+FROM nvidia/cuda:12.3.1-runtime-ubuntu22.04
 
-# Criar usuário não-root
-RUN groupadd -r appuser && useradd -r -g appuser -s /sbin/nologin appuser && \
-    apt-get update && \
-    apt-get install -y --no-install-recommends \
+# Set environment variables
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONPATH=/app \
+    TRANSFORMERS_CACHE=/app/cache/transformers \
+    TORCH_HOME=/app/cache/torch \
+    HF_HOME=/app/cache/huggingface
+
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y \
+    python3.10 \
+    python3-pip \
+    ffmpeg \
+    libsndfile1 \
     curl \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd -m -u 1000 appuser
 
+# Set up app directory and cache
 WORKDIR /app
+RUN mkdir -p /app/cache/{transformers,torch,huggingface} \
+    && mkdir -p /app/{logs,uploads,temp,models} \
+    && chown -R appuser:appuser /app \
+    && chmod -R 755 /app/cache
 
-# Copiar pacotes Python do builder
-COPY --from=builder /usr/local/lib/python3.10/site-packages /usr/local/lib/python3.10/site-packages
+# Copy Python packages from builder
+COPY --from=builder /usr/local/lib/python3.10/dist-packages /usr/local/lib/python3.10/dist-packages
 
-# Copiar código do serviço
-COPY --chown=appuser:appuser ./services/image_generator /app/services/image_generator
+# Create Python package structure
+RUN mkdir -p /app/services/image_generator
+COPY --chown=appuser:appuser ./services/image_generator/__init__.py /app/services/image_generator/
+COPY --chown=appuser:appuser ./services/image_generator/app.py /app/services/image_generator/
+COPY --chown=appuser:appuser ./services/image_generator/validations.py /app/services/image_generator/
+COPY --chown=appuser:appuser ./services/image_generator/config.py /app/services/image_generator/
+COPY --chown=appuser:appuser ./services/image_generator/routers /app/services/image_generator/routers
 COPY --chown=appuser:appuser ./shared /app/shared
 
-# Criar diretórios necessários
-RUN mkdir -p /app/models /app/storage /app/logs /app/cache && \
-    chown -R appuser:appuser /app && \
-    chmod -R 755 /app/models /app/storage /app/logs /app/cache
-
+# Switch to non-root user
 USER appuser
 
-ENV PYTHONPATH=/app
-ENV PYTHONUNBUFFERED=1
-
+# Set working directory
 WORKDIR /app/services/image_generator
 
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+# Health check
+HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
-EXPOSE 8000
-
-CMD ["python3", "-m", "uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+# Run the application
+CMD ["python3", "-m", "uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
