@@ -1,17 +1,18 @@
 # Framework web e utilitários
-fastapi==0.95.2
-uvicorn[standard]==0.22.0
-python-multipart==0.0.6
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+python-multipart==0.0.9
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
-dynaconf==3.2.4
+pydantic==2.5.2
+pydantic-settings==2.0.3
 email-validator==2.0.0
-starlette==0.27.0
+starlette==0.36.3
 
 # Banco de dados e migrações
-sqlalchemy==1.4.41
+sqlalchemy==2.0.23
 aiosqlite==0.19.0
-alembic==1.7.7
+alembic==1.13.1
 
 # Cache
 redis==5.0.1
