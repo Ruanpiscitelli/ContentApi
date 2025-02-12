@@ -5,14 +5,12 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker, declarative_base
 from sqlalchemy.pool import AsyncAdaptedQueuePool
 
-from .config import get_settings
-
-settings = get_settings()
+from .config import settings
 
 # Cria engine assíncrona
 engine = create_async_engine(
-    settings.DATABASE_URL,
-    echo=settings.DEBUG,
+    settings.database_url,
+    echo=settings.debug,
     future=True,
     poolclass=AsyncAdaptedQueuePool,
     pool_pre_ping=True,
