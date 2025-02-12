@@ -21,6 +21,7 @@ RUN python -m pip install --upgrade pip==23.0.1
 RUN pip install --no-cache-dir \
     pydantic==1.10.12 \
     fastapi==0.95.2 \
+    typing-extensions==4.12.2 \
     -r requirements.txt
 
 # Runtime stage
