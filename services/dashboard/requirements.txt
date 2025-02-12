@@ -1,14 +1,14 @@
 # Framework web e utilitários
-fastapi==0.100.0
+fastapi==0.95.2
 uvicorn[standard]==0.22.0
 python-multipart==0.0.6
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
-pydantic>=2.5.2
+pydantic<2.0.0,>=1.10.0
 email-validator==2.0.0
 
 # Banco de dados e migrações
-sqlalchemy>=2.0.23
+sqlalchemy==1.4.41
 aiosqlite==0.19.0
 alembic==1.7.7
 
@@ -42,6 +42,6 @@ orjson==3.9.7
 aiofiles==23.1.0
 
 # Dependências específicas do uvicorn[standard]
-httptools==0.5.0
+httptools==0.2.0
 uvloop==0.17.0
-websockets==11.0.3 
+websockets==10.4 
