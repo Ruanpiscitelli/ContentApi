@@ -1,5 +1,5 @@
 # Build stage
-FROM python:3.10-slim as builder
+FROM python:3.10-slim
 
 ENV PYTHONUNBUFFERED=1
 ENV PIP_NO_CACHE_DIR=1
@@ -8,9 +8,8 @@ ENV PYTHONDONTWRITEBYTECODE=1
 # Instalar dependências do sistema
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-    build-essential \
-    python3-dev \
-    git \
+    curl \
+    libcap2-bin \
     && rm -rf /var/lib/apt/lists/*
 
 # Configurar diretório de trabalho
@@ -18,7 +17,8 @@ WORKDIR /build
 
 # Copiar e instalar requirements
 COPY services/dashboard/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -U pip && \
+    pip install --no-cache-dir -r requirements.txt
 
 # Runtime stage
 FROM python:3.10-slim
