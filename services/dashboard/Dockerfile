@@ -18,9 +18,7 @@ WORKDIR /build
 
 # Copiar e instalar requirements
 COPY services/dashboard/requirements.txt .
-RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
-    pip install --no-cache-dir pydantic-settings==2.0.3 && \
-    pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Runtime stage
 FROM python:3.10-slim
@@ -43,7 +41,8 @@ RUN apt-get update && \
 WORKDIR /app
 
 # Copiar dependências do builder
-COPY --from=builder /usr/local/lib/python3.10/site-packages /usr/local/lib/python3.10/site-packages
+COPY --from=builder /root/.local /root/.local
+ENV PATH=/root/.local/bin:$PATH
 
 # Copiar código da aplicação
 COPY --chown=appuser:appuser ./services/dashboard /app/services/dashboard
@@ -67,7 +66,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
 
 EXPOSE 80
 
-CMD ["python3", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "80", "--reload", "--root-path", "/app/services/dashboard"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "80"]
 
 # Voltar para usuário appuser após instalação
 USER appuser 
