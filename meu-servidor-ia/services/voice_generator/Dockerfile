@@ -1,66 +1,82 @@
 # Build stage
-FROM nvidia/cuda:12.3.1-devel-ubuntu22.04 AS builder
+FROM nvidia/cuda:12.3.1-devel-ubuntu22.04 as builder
 
-ENV DEBIAN_FRONTEND=noninteractive
-ENV PYTHONUNBUFFERED=1
-ENV PIP_NO_CACHE_DIR=1
+# Set environment variables
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    TORCH_CUDA_ARCH_LIST="7.5 8.0 8.6 8.9 9.0+PTX" \
+    TORCH_NVCC_FLAGS="-Xfatbin -compress-all" \
+    CMAKE_CUDA_ARCHITECTURES="75 80 86 89 90"
 
-# Instalar dependências do sistema
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
     python3.10 \
-    python3.10-dev \
     python3-pip \
+    python3.10-dev \
     build-essential \
-    curl \
+    cmake \
     git \
+    ninja-build \
+    pkg-config \
     && rm -rf /var/lib/apt/lists/*
 
+# Set up build directory
 WORKDIR /build
 
-# Instalar torch primeiro
-RUN pip3 install --no-cache-dir torch==2.2.1 torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+# Install torch first with CUDA 12.1 support
+RUN pip3 install --no-cache-dir torch==2.2.1 torchaudio==2.2.1 --index-url https://download.pytorch.org/whl/cu121
 
-# Copiar e instalar requirements
+# Install triton and xformers for optimizations
+RUN pip3 install --no-cache-dir triton==2.1.0 xformers==0.0.23
+
+# Copy and install remaining requirements
 COPY ./services/voice_generator/requirements.txt .
 RUN pip3 install --no-cache-dir -r requirements.txt
 
 # Runtime stage
 FROM nvidia/cuda:12.3.1-runtime-ubuntu22.04
 
-ENV DEBIAN_FRONTEND=noninteractive
-ENV PYTHONUNBUFFERED=1
-ENV PYTHONPATH=/app
+# Set environment variables
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    TRANSFORMERS_CACHE=/app/cache/transformers \
+    TORCH_HOME=/app/cache/torch \
+    HF_HOME=/app/cache/huggingface
 
-# Instalar runtime deps
+# Install runtime dependencies
 RUN apt-get update && apt-get install -y \
     python3.10 \
     python3-pip \
-    curl \
     ffmpeg \
-    && rm -rf /var/lib/apt/lists/*
+    libsndfile1 \
+    curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd -m -u 1000 appuser
 
-# Criar usuário não-root
-RUN groupadd -g 1000 appuser && \
-    useradd -m -u 1000 -g appuser appuser && \
-    mkdir -p /app/{data,logs,uploads,cache,temp,models} && \
-    chown -R appuser:appuser /app
-
+# Set up app directory and cache
 WORKDIR /app
+RUN mkdir -p /app/cache/{transformers,torch,huggingface} \
+    && mkdir -p /app/{logs,uploads,temp} \
+    && chown -R appuser:appuser /app
 
-# Copiar pacotes Python do builder
+# Copy Python packages from builder
 COPY --from=builder /usr/local/lib/python3.10/dist-packages /usr/local/lib/python3.10/dist-packages
 
-# Copiar código da aplicação
+# Copy application code
 COPY --chown=appuser:appuser ./services/voice_generator /app/services/voice_generator
 COPY --chown=appuser:appuser ./shared /app/shared
 
+# Switch to non-root user
 USER appuser
 
+# Set working directory
 WORKDIR /app/services/voice_generator
 
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+# Health check
+HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
-EXPOSE 8000
-
-CMD ["python3", "-m", "uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
+# Run the application
+CMD ["python3", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
