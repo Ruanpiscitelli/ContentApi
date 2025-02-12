@@ -19,7 +19,8 @@ WORKDIR /build
 # Copiar e instalar requirements
 COPY services/dashboard/requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
-    pip install --no-cache-dir -r requirements.txt
+    pip install --no-cache-dir -r requirements.txt && \
+    pip install --no-cache-dir sse-starlette
 
 # Runtime stage
 FROM python:3.10-slim
