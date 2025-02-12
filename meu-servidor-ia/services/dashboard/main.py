@@ -9,14 +9,14 @@ import asyncio
 import psutil
 from datetime import datetime, timedelta
 from typing import List, Optional
+import json
 
 from fastapi import FastAPI, Request, Depends, HTTPException, status, Form
-from fastapi.responses import HTMLResponse, JSONResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
-from sse_starlette.sse import EventSourceResponse
 
 from core.database import get_db, init_db
 from core.models import User, APIKey, LogEntry
@@ -268,16 +268,24 @@ async def stream_logs(current_user: User = Depends(get_current_user)):
     """
     async def event_generator():
         while True:
-            # Simula a busca de novos logs (em uma implementação real,
-            # isso seria integrado com um sistema de logs real)
+            # Simula a busca de novos logs
             await asyncio.sleep(1)
-            yield {
+            data = {
                 "timestamp": datetime.now().isoformat(),
                 "level": "INFO",
                 "message": "Sistema funcionando normalmente"
             }
-    
-    return EventSourceResponse(event_generator())
+            yield f"data: {json.dumps(data)}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no"
+        }
+    )
 
 if __name__ == "__main__":
     import uvicorn

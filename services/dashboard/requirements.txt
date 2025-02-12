@@ -7,7 +7,6 @@ passlib[bcrypt]==1.7.4
 pydantic==1.10.12
 email-validator==2.0.0
 starlette==0.27.0
-git+https://github.com/sysid/sse-starlette.git@master#egg=sse-starlette
 
 # Banco de dados e migrações
 sqlalchemy==1.4.41
