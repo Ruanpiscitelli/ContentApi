@@ -54,6 +54,14 @@ USER root
 
 WORKDIR /app/services/dashboard
 
+# Permissão para usar porta 80 sem sudo
+RUN apt-get update && apt-get install -y libcap2-bin && \
+    setcap 'cap_net_bind_service=+ep' /usr/local/bin/python3.10 && \
+    chmod u+s /usr/local/bin/python3.10
+
+# Garanta a criação do diretório de logs
+RUN mkdir -p /app/logs && chown -R appuser:appuser /app
+
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:80/health || exit 1
 
