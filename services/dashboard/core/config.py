@@ -77,10 +77,15 @@ class Settings(BaseSettings):
         case_sensitive = True
         env_file = ".env"
 
+# Função para obter as configurações
+def get_settings() -> Settings:
+    """Retorna uma instância das configurações."""
+    return Settings()
+
 # Instância global das configurações
-settings = Settings()
+settings = get_settings()
 
 # Criar diretórios necessários
 os.makedirs(os.path.dirname(settings.DATABASE_URL.replace("sqlite:///", "")), exist_ok=True)
 os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
-os.makedirs(settings.LOG_DIR, exist_ok=True) 
+os.makedirs(settings.LOG_DIR, exist_ok=True)

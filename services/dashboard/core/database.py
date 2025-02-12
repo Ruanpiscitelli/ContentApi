@@ -5,7 +5,9 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker, declarative_base
 from sqlalchemy.pool import AsyncAdaptedQueuePool
 
-from .config import settings
+from .config import get_settings
+
+settings = get_settings()
 
 # Cria engine assíncrona
 engine = create_async_engine(
@@ -56,4 +58,4 @@ async def init_db():
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
     except Exception as e:
-        raise Exception(f"Erro ao inicializar banco de dados: {str(e)}") 
+        raise Exception(f"Erro ao inicializar banco de dados: {str(e)}")
