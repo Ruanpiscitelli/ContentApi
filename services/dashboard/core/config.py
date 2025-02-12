@@ -4,6 +4,7 @@ Configurações centralizadas do dashboard.
 import os
 from pathlib import Path
 from typing import Dict, Any
+from functools import lru_cache
 from pydantic import BaseSettings
 
 # Diretório base do projeto
@@ -77,7 +78,7 @@ class Settings(BaseSettings):
         case_sensitive = True
         env_file = ".env"
 
-# Função para obter as configurações
+@lru_cache()
 def get_settings() -> Settings:
     """Retorna uma instância das configurações."""
     return Settings()

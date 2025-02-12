@@ -5,6 +5,7 @@ python-multipart==0.0.6
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
 pydantic==1.10.12
+python-dotenv==1.0.0
 email-validator==2.0.0
 starlette==0.27.0
 
@@ -18,7 +19,6 @@ redis==5.0.1
 
 # Templates e frontend
 jinja2==3.1.2
-python-dotenv==1.0.0
 
 # Logging e monitoramento
 loguru==0.7.0
