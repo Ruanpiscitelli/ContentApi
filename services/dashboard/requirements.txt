@@ -1,47 +1,47 @@
 # Framework web e utilitários
-fastapi==0.95.2
-uvicorn[standard]==0.22.0
-python-multipart==0.0.6
-python-jose[cryptography]==3.3.0
-passlib[bcrypt]==1.7.4
-pydantic<2.0.0,>=1.10.0
-email-validator==2.0.0
+fastapi>=0.100.0,<0.101.0
+uvicorn[standard]>=0.23.0,<0.24.0
+python-multipart>=0.0.6
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.4
+pydantic>=2.5.2
+email-validator>=2.0.0
 
 # Banco de dados e migrações
-sqlalchemy==1.4.41
-aiosqlite==0.19.0
-alembic==1.7.7
+sqlalchemy>=2.0.23
+aiosqlite>=0.19.0
+alembic>=1.12.0
 
 # Cache
-redis==5.0.1
+redis>=5.0.1
 
 # Templates e frontend
-jinja2==3.1.2
-python-dotenv==1.0.0
+jinja2>=3.1.2
+python-dotenv>=1.0.0
 
 # Logging e monitoramento
-loguru==0.7.0
+loguru>=0.7.0
 
 # Testes
-pytest==7.4.0
-pytest-asyncio==0.21.0
-httpx==0.24.1
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+httpx>=0.24.1
 
 # Monitoramento
-psutil==5.9.5
-aiohttp==3.8.5
+psutil>=5.9.5
+aiohttp>=3.8.5
 
 # Segurança
-bcrypt==4.0.1
+bcrypt>=4.0.1
 
 # Utilitários
-python-dateutil==2.8.2
-humanize==4.7.0
-tenacity==8.2.2
-orjson==3.9.7
-aiofiles==23.1.0
+python-dateutil>=2.8.2
+humanize>=4.7.0
+tenacity>=8.2.2
+orjson>=3.9.7
+aiofiles>=23.1.0
 
 # Dependências específicas do uvicorn[standard]
-httptools==0.2.0
-uvloop==0.17.0
-websockets==10.4 
+httptools>=0.5.0
+uvloop>=0.17.0
+websockets>=10.4 
