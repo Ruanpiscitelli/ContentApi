@@ -70,8 +70,10 @@ COPY --from=builder /usr/local/lib/python3.10/dist-packages /usr/local/lib/pytho
 RUN mkdir -p /app/services/image_generator
 COPY --chown=appuser:appuser ./services/image_generator/__init__.py /app/services/image_generator/
 COPY --chown=appuser:appuser ./services/image_generator/app.py /app/services/image_generator/
-COPY --chown=appuser:appuser ./services/image_generator/validations.py /app/services/image_generator/
+COPY --chown=appuser:appuser ./services/image_generator/validation.py /app/services/image_generator/
 COPY --chown=appuser:appuser ./services/image_generator/config.py /app/services/image_generator/
+COPY --chown=appuser:appuser ./services/image_generator/compat.py /app/services/image_generator/
+COPY --chown=appuser:appuser ./services/image_generator/samplers.py /app/services/image_generator/
 COPY --chown=appuser:appuser ./services/image_generator/routers /app/services/image_generator/routers
 COPY --chown=appuser:appuser ./shared /app/shared
 
