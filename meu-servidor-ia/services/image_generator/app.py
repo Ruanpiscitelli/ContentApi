@@ -78,6 +78,44 @@ MEMORY_CONFIG = {
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Adiciona lista de modelos suportados
+SUPPORTED_MODELS = {
+    "cagliostrolab/animagine-xl-4.0": {
+        "type": "sdxl",
+        "min_vram": 12,
+        "recommended_vram": 16
+    },
+    "John6666/ultimate-realistic-mix-v2-sdxl": {
+        "type": "sdxl",
+        "min_vram": 12,
+        "recommended_vram": 16
+    }
+}
+
+def validate_model_support(model_id: str) -> None:
+    """
+    Valida se o modelo é suportado e se há recursos suficientes.
+    
+    Args:
+        model_id: ID do modelo a ser validado
+        
+    Raises:
+        ValidationError: Se o modelo não for suportado ou não houver recursos suficientes
+    """
+    if model_id not in SUPPORTED_MODELS:
+        raise ValidationError(
+            f"Modelo {model_id} não suportado. Modelos suportados: {list(SUPPORTED_MODELS.keys())}"
+        )
+    
+    model_info = SUPPORTED_MODELS[model_id]
+    if torch.cuda.is_available():
+        gpu_memory = torch.cuda.get_device_properties(0).total_memory / (1024**3)  # GB
+        if gpu_memory < model_info["min_vram"]:
+            raise ValidationError(
+                f"Modelo {model_id} requer mínimo de {model_info['min_vram']}GB de VRAM. "
+                f"Detectado: {gpu_memory:.1f}GB"
+            )
+
 # Gerenciamento de lifecycle
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -542,26 +580,49 @@ def _load_pipeline_sync(model_id: str) -> StableDiffusionPipeline:
     """Função síncrona para carregar o pipeline do modelo"""
     logger.info(f"Carregando modelo {model_id}")
     
-    if "xl" in model_id.lower():
-        pipeline = StableDiffusionXLPipeline.from_pretrained(
-            model_id,
-            torch_dtype=torch.float16,
-            use_safetensors=True,
-            variant="fp16"
-        )
+    # Verifica se é um caminho local
+    local_model_path = os.path.join("models", model_id)
+    if os.path.exists(local_model_path):
+        logger.info(f"Carregando modelo local de {local_model_path}")
+        if "xl" in model_id.lower():
+            pipeline = StableDiffusionXLPipeline.from_single_file(
+                local_model_path,
+                torch_dtype=torch.float16,
+                use_safetensors=True,
+                variant="fp16"
+            )
+        else:
+            pipeline = StableDiffusionPipeline.from_single_file(
+                local_model_path,
+                torch_dtype=torch.float16,
+                use_safetensors=True,
+                variant="fp16"
+            )
     else:
-        pipeline = StableDiffusionPipeline.from_pretrained(
-            model_id,
-            torch_dtype=torch.float16,
-            use_safetensors=True,
-            variant="fp16"
-        )
+        # Carrega do HuggingFace
+        if "xl" in model_id.lower():
+            pipeline = StableDiffusionXLPipeline.from_pretrained(
+                model_id,
+                torch_dtype=torch.float16,
+                use_safetensors=True,
+                variant="fp16"
+            )
+        else:
+            pipeline = StableDiffusionPipeline.from_pretrained(
+                model_id,
+                torch_dtype=torch.float16,
+                use_safetensors=True,
+                variant="fp16"
+            )
         
     pipeline.to(DEVICE)
     return pipeline
 
 async def load_pipeline(model_id: str) -> StableDiffusionPipeline:
     """Carrega um pipeline do cache ou baixa se necessário de forma assíncrona"""
+    # Valida suporte ao modelo
+    validate_model_support(model_id)
+    
     if model_id not in MODEL_CACHE:
         # Executa o carregamento pesado em uma thread separada
         pipeline = await asyncio.get_event_loop().run_in_executor(
