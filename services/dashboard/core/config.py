@@ -4,12 +4,12 @@ Configurações centralizadas do dashboard.
 import os
 from pathlib import Path
 from typing import Dict, Any
-from pydantic import BaseModel
+from pydantic import BaseSettings
 
 # Diretório base do projeto
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
-class Settings(BaseModel):
+class Settings(BaseSettings):
     """Configurações da aplicação"""
     # Servidor
     APP_NAME: str = "Dashboard"
@@ -75,6 +75,7 @@ class Settings(BaseModel):
     
     class Config:
         case_sensitive = True
+        env_file = ".env"
 
 # Instância global das configurações
 settings = Settings()
