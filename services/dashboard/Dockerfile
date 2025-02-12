@@ -18,7 +18,7 @@ WORKDIR /build
 # Copiar e instalar requirements
 COPY services/dashboard/requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
-    pip wheel --no-cache-dir --no-deps --wheel-dir /build/wheels -r requirements.txt
+    pip install --no-cache-dir -r requirements.txt
 
 # Runtime stage
 FROM python:3.10-slim
@@ -40,9 +40,8 @@ RUN apt-get update && \
 
 WORKDIR /app
 
-# Copiar wheels do builder
-COPY --from=builder /build/wheels /wheels
-RUN pip install --no-cache-dir /wheels/*
+# Copiar dependências do builder
+COPY --from=builder /usr/local/lib/python3.10/site-packages /usr/local/lib/python3.10/site-packages
 
 # Copiar código da aplicação
 COPY --chown=appuser:appuser ./services/dashboard /app/services/dashboard
