@@ -85,4 +85,4 @@ settings = Dynaconf(
 # Criar diretórios necessários
 os.makedirs(os.path.dirname(settings.database_url.replace("sqlite:///", "")), exist_ok=True)
 os.makedirs(settings.upload_dir, exist_ok=True)
-os.makedirs(settings.log_dir, exist_ok=True)
+os.makedirs(settings.log_dir, exist_ok=True) 

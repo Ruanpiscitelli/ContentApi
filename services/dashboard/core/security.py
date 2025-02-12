@@ -8,7 +8,7 @@ from fastapi import HTTPException, Security, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 from passlib.context import CryptContext
-from .config import settings
+from .settings import settings
 from .database import get_session
 from .models import User
 

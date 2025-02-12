@@ -5,7 +5,7 @@ Configuração do Redis para cache.
 from typing import Optional, Any
 import json
 import aioredis
-from .config import settings
+from .settings import settings
 
 # Conexão com Redis
 redis = aioredis.from_url(

@@ -8,7 +8,7 @@ from alembic import context
 import asyncio
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-from ..core.config import settings
+from ..core.settings import settings
 from ..models.database import Base
 
 # Carrega configurações do alembic.ini
