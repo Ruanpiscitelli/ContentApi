@@ -10,7 +10,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 # Configurações do servidor
 HOST = os.getenv("DASHBOARD_HOST", "0.0.0.0")
-PORT = int(os.getenv("DASHBOARD_PORT", 8000))
+PORT = int(os.getenv("DASHBOARD_PORT", "80"))
 DEBUG = os.getenv("DASHBOARD_DEBUG", "False").lower() == "true"
 
 # Configurações de segurança

@@ -29,7 +29,7 @@ cd /app/meu-servidor-ia/services/dashboard
 if python3 -c "import uvloop" 2>/dev/null; then
     exec uvicorn app:app \
         --host 0.0.0.0 \
-        --port 8000 \
+        --port 80 \
         --workers 1 \
         --loop uvloop \
         --http httptools \
@@ -39,7 +39,7 @@ if python3 -c "import uvloop" 2>/dev/null; then
 else
     exec uvicorn app:app \
         --host 0.0.0.0 \
-        --port 8000 \
+        --port 80 \
         --workers 1 \
         --timeout-keep-alive 120 \
         --limit-concurrency 1000 \
