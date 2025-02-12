@@ -17,8 +17,11 @@ WORKDIR /build
 
 # Copiar e instalar requirements
 COPY services/dashboard/requirements.txt .
-RUN pip install --no-cache-dir -U pip && \
-    pip install --no-cache-dir -r requirements.txt
+RUN python -m pip install --upgrade pip==23.0.1
+RUN pip install --no-cache-dir \
+    pydantic==1.10.12 \
+    fastapi==0.95.2 \
+    -r requirements.txt
 
 # Runtime stage
 FROM python:3.10-slim
