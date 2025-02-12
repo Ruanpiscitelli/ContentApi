@@ -24,7 +24,7 @@ RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
 # Runtime stage
 FROM python:3.10-slim
 
-ENV PYTHONPATH=/app/services/dashboard
+ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
 ENV USER_NAME=appuser
 ENV PIP_NO_CACHE_DIR=1

@@ -18,9 +18,9 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 from sse_starlette.sse import EventSourceResponse
 
-from .database import get_db, init_db
-from .models import User, APIKey, LogEntry
-from .auth import (
+from core.database import get_db, init_db
+from core.models import User, APIKey, LogEntry
+from core.security import (
     get_current_user,
     authenticate_user,
     create_access_token,
