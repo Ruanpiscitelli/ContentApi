@@ -1,5 +1,3 @@
-version: '3.8'
-
 # Configurações comuns para todos os serviços
 x-common-settings: &common-settings
   restart: unless-stopped
@@ -80,10 +78,10 @@ services:
       - base
 
   image-generator:
-    <<: [*common-settings, *gpu-settings]
+    <<: [*common-settings]
     build:
-      context: ./meu-servidor-ia
-      dockerfile: services/image_generator/Dockerfile
+      context: .
+      dockerfile: meu-servidor-ia/services/image_generator/Dockerfile
     volumes:
       - ./models:/app/models:ro
       - ./storage:/app/storage
@@ -92,8 +90,6 @@ services:
     ports:
       - "8002:8000"
     environment:
-      - NVIDIA_VISIBLE_DEVICES=1
-      - CUDA_VISIBLE_DEVICES=1
       - PYTHONPATH=/app
       - PYTHONUNBUFFERED=1
     depends_on:
@@ -145,9 +141,7 @@ services:
       context: .
       dockerfile: meu-servidor-ia/services/video_editor/Dockerfile
     volumes:
-      - ./cache:/app/cache
-      - ./logs:/app/logs
-      - ./uploads:/app/uploads
+      - ./meu-servidor-ia/shared:/app/shared:z
     environment:
       - PYTHONPATH=/app
       - TRANSFORMERS_CACHE=/app/cache/transformers
@@ -193,6 +187,8 @@ services:
       - text-generation
       - voice-generator
       - video-editor
+    volumes:
+      - ./meu-servidor-ia/shared:/app/shared:z
 
 networks:
   default:
@@ -202,4 +198,10 @@ networks:
         - subnet: 172.28.0.0/24
 
 volumes:
-  redis_data: 
+  redis_data: {}
+  shared:
+    driver: local
+    driver_opts:
+      type: none
+      device: ./meu-servidor-ia/shared
+      o: bind 

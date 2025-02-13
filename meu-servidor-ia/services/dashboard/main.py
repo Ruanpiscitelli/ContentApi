@@ -17,8 +17,11 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
+from loguru import logger
+from sqlalchemy import select, or_, and_
+from sqlalchemy.sql import func
 
-from core.database import get_db, init_db
+from core.database import get_session as get_db, init_db
 from core.models import User, APIKey, LogEntry
 from core.security import (
     get_current_user,
@@ -27,6 +30,7 @@ from core.security import (
     get_password_hash,
     generate_api_key
 )
+from core.middleware import setup_middlewares
 
 # Configuração do FastAPI
 app = FastAPI(
@@ -35,9 +39,23 @@ app = FastAPI(
     version="1.0.0"
 )
 
+# Configuração dos middlewares
+setup_middlewares(app)
+
 # Configuração dos templates e arquivos estáticos
 templates = Jinja2Templates(directory="templates")
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# Configuração do logger
+logger.add(
+    "logs/api.log",
+    rotation="500 MB",
+    retention="10 days",
+    level="INFO",
+    format="{time} {level} {message}",
+    backtrace=True,
+    diagnose=True
+)
 
 # Configurações
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
@@ -46,7 +64,9 @@ MAX_API_KEYS_PER_USER = 5
 @app.on_event("startup")
 async def startup_event():
     """Inicializa o banco de dados na inicialização do servidor."""
+    logger.info("Iniciando o servidor...")
     await init_db()
+    logger.info("Banco de dados inicializado com sucesso.")
 
 @app.get("/", response_class=HTMLResponse)
 async def dashboard(
@@ -55,19 +75,23 @@ async def dashboard(
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Renderiza a página principal do dashboard com estatísticas do sistema,
-    chaves de API do usuário e logs recentes.
+    Renderiza o dashboard principal.
     """
     # Busca as chaves de API do usuário
-    api_keys = await db.query(APIKey).filter(
-        APIKey.user_id == current_user.id
-    ).order_by(APIKey.created_at.desc()).all()
-    
-    # Busca os logs mais recentes
-    logs = await db.query(LogEntry).order_by(
-        LogEntry.timestamp.desc()
-    ).limit(100).all()
-    
+    stmt_keys = select(APIKey).where(
+        and_(
+            APIKey.user_id == current_user.id,
+            APIKey.is_active == True
+        )
+    )
+    result_keys = await db.execute(stmt_keys)
+    api_keys = result_keys.scalars().all()
+
+    # Busca os últimos logs
+    stmt_logs = select(LogEntry).order_by(LogEntry.timestamp.desc()).limit(10)
+    result_logs = await db.execute(stmt_logs)
+    logs = result_logs.scalars().all()
+
     return templates.TemplateResponse(
         "dashboard.html",
         {
@@ -146,9 +170,11 @@ async def register(
     Processa o registro de um novo usuário.
     """
     # Verifica se o usuário já existe
-    existing_user = await db.query(User).filter(
-        (User.username == username) | (User.email == email)
-    ).first()
+    stmt = select(User).where(
+        or_(User.username == username, User.email == email)
+    )
+    result = await db.execute(stmt)
+    existing_user = result.scalar_one_or_none()
     
     if existing_user:
         return templates.TemplateResponse(
@@ -200,10 +226,14 @@ async def generate_api_key(
     Gera uma nova chave de API para o usuário atual.
     """
     # Verifica o limite de chaves
-    active_keys_count = await db.query(APIKey).filter(
-        APIKey.user_id == current_user.id,
-        APIKey.is_active == True
-    ).count()
+    stmt = select(func.count()).select_from(APIKey).where(
+        and_(
+            APIKey.user_id == current_user.id,
+            APIKey.is_active == True
+        )
+    )
+    result = await db.execute(stmt)
+    active_keys_count = result.scalar()
     
     if active_keys_count >= MAX_API_KEYS_PER_USER:
         raise HTTPException(
@@ -242,10 +272,14 @@ async def revoke_api_key(
     """
     Revoga uma chave de API específica.
     """
-    api_key = await db.query(APIKey).filter(
-        APIKey.id == key_id,
-        APIKey.user_id == current_user.id
-    ).first()
+    stmt = select(APIKey).where(
+        and_(
+            APIKey.id == key_id,
+            APIKey.user_id == current_user.id
+        )
+    )
+    result = await db.execute(stmt)
+    api_key = result.scalar_one_or_none()
     
     if not api_key:
         raise HTTPException(
@@ -286,6 +320,19 @@ async def stream_logs(current_user: User = Depends(get_current_user)):
             "X-Accel-Buffering": "no"
         }
     )
+
+@app.get("/health")
+async def health_check():
+    """Endpoint para verificar a saúde do servidor."""
+    return {
+        "status": "healthy",
+        "timestamp": datetime.utcnow().isoformat(),
+        "version": app.version,
+        "system": {
+            "cpu_percent": psutil.cpu_percent(),
+            "memory_percent": psutil.virtual_memory().percent
+        }
+    }
 
 if __name__ == "__main__":
     import uvicorn

@@ -33,9 +33,13 @@ COPY --chown=appuser:appuser ./services/dashboard /app/services/dashboard
 COPY --chown=appuser:appuser ./shared /app/shared
 
 # Criar diretórios e ajustar permissões
-RUN mkdir -p /app/logs && \
+RUN mkdir -p /app/services/dashboard/logs /app/services/dashboard/data /app/services/dashboard/static /app/services/dashboard/templates /app/services/dashboard/logs/api && \
     chown -R ${USER_NAME}:${USER_NAME} /app && \
-    chmod -R 755 /app/logs
+    chmod -R 755 /app/services/dashboard/logs && \
+    chmod -R 755 /app/services/dashboard/data && \
+    chmod -R 755 /app/services/dashboard/static && \
+    chmod -R 755 /app/services/dashboard/templates && \
+    chmod -R 777 /app/services/dashboard/logs/api
 
 # Mudar para o diretório do serviço
 WORKDIR /app/services/dashboard
@@ -49,4 +53,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
 
 EXPOSE 8000
 
-CMD ["python3", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"] 
+# Inicializar o banco de dados e iniciar o servidor
+CMD ["sh", "-c", "python -c 'from main import init_db; import asyncio; asyncio.run(init_db())' && python3 -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload"] 

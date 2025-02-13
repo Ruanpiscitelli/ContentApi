@@ -11,7 +11,7 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 # Copiar e instalar requirements
-COPY ./services/video_editor/requirements.txt .
+COPY meu-servidor-ia/services/video_editor/requirements.txt .
 RUN pip3 install --no-cache-dir -r requirements.txt
 
 # Runtime stage
@@ -30,8 +30,8 @@ WORKDIR /app
 COPY --from=builder /usr/local/lib/python3.10/site-packages /usr/local/lib/python3.10/site-packages
 
 # Copiar código do serviço
-COPY --chown=appuser:appuser ./services/video_editor /app/services/video_editor
-COPY --chown=appuser:appuser ./shared /app/shared
+COPY --chown=appuser:appuser meu-servidor-ia/services/video_editor /app/services/video_editor
+COPY --chown=appuser:appuser meu-servidor-ia/shared /app/shared
 
 USER appuser
 

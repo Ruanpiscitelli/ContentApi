@@ -7,12 +7,14 @@ from fastapi import Depends, Request
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 from jose import JWTError, jwt
+from sqlalchemy import select
 
 from .database import get_db
 from .models import User
 from .exceptions import AuthenticationError
 from .config import SECRET_KEY, ALGORITHM
 from .utils import logger
+from .security import verify_password
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
@@ -175,4 +177,18 @@ def get_search_param(
     """
     if not search or len(search.strip()) < min_length:
         return None
-    return search.strip() 
+    return search.strip()
+
+async def authenticate_user(username: str, password: str, db: AsyncSession) -> Optional[User]:
+    """
+    Autentica um usuário verificando suas credenciais.
+    """
+    stmt = select(User).where(User.username == username)
+    result = await db.execute(stmt)
+    user = result.scalar_one_or_none()
+    
+    if not user:
+        return None
+    if not verify_password(password, user.hashed_password):
+        return None
+    return user 

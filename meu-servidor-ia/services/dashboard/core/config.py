@@ -5,7 +5,7 @@ Carrega variáveis de ambiente e fornece configurações para toda a aplicação
 
 from functools import lru_cache
 from typing import Dict, Any, Optional
-from pydantic_settings import BaseSettings
+from pydantic import BaseSettings
 
 class Settings(BaseSettings):
     """

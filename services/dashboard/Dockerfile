@@ -18,6 +18,8 @@ COPY services/dashboard/requirements.txt .
 RUN pip install --no-cache-dir \
     pydantic==1.10.12 \
     fastapi==0.95.2 \
+    anyio==3.7.1 \
+    starlette==0.27.0 \
     -r requirements.txt
 
 # Copy application code
@@ -37,4 +39,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
 
 EXPOSE 80
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "80"] 
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "80"]
