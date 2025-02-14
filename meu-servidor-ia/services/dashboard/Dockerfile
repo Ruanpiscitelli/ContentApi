@@ -23,12 +23,12 @@ RUN apt-get update && \
 WORKDIR /app
 
 # Copiar e instalar requirements com otimização de cache
-COPY --chown=${USER_NAME}:${USER_NAME} services/dashboard/requirements.txt ${APP_HOME}/requirements.txt
+COPY --chown=${USER_NAME}:${USER_NAME} ./requirements.txt ${APP_HOME}/requirements.txt
 RUN pip install --no-cache-dir -r ${APP_HOME}/requirements.txt
 
 # Copiar código da aplicação com permissões corretas
-COPY --chown=${USER_NAME}:${USER_NAME} ./services/dashboard ${APP_HOME}
-COPY --chown=${USER_NAME}:${USER_NAME} ./shared /app/shared
+COPY --chown=${USER_NAME}:${USER_NAME} . ${APP_HOME}
+COPY --chown=${USER_NAME}:${USER_NAME} ../shared /app/shared
 
 # Criar diretórios com permissões seguras
 RUN mkdir -p ${APP_HOME}/{logs,data,static,templates,cache} && \

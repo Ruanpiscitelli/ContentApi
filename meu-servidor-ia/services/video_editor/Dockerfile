@@ -10,8 +10,10 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-# Copiar e instalar requirements
-COPY meu-servidor-ia/services/video_editor/requirements.txt .
+# Copiar o arquivo requirements.txt para o diretório atual (build context)
+COPY services/video_editor/requirements.txt .
+
+# Instalar as dependências do Python
 RUN pip3 install --no-cache-dir -r requirements.txt
 
 # Runtime stage
@@ -29,9 +31,9 @@ WORKDIR /app
 # Copiar pacotes Python do builder
 COPY --from=builder /usr/local/lib/python3.10/site-packages /usr/local/lib/python3.10/site-packages
 
-# Copiar código do serviço
-COPY --chown=appuser:appuser meu-servidor-ia/services/video_editor /app/services/video_editor
-COPY --chown=appuser:appuser meu-servidor-ia/shared /app/shared
+# Copiar o restante do código do video_editor para a imagem
+COPY --chown=appuser:appuser services/video_editor /app/services/video_editor
+COPY --chown=appuser:appuser shared /app/shared
 
 USER appuser
 
