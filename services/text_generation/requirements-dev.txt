@@ -1,0 +1,43 @@
+# Dependências de desenvolvimento
+pytest>=7.0.0
+pytest-asyncio>=0.18.0
+pytest-cov>=3.0.0
+pytest-mock>=3.7.0
+pytest-xdist>=2.5.0
+pytest-env>=0.6.0
+
+# Formatação e linting
+black>=22.0.0
+flake8>=4.0.0
+isort>=5.10.0
+mypy>=0.950
+pylint>=2.12.0
+
+# Documentação
+mkdocs>=1.2.0
+mkdocs-material>=8.0.0
+mkdocstrings>=0.18.0
+
+# Ferramentas de desenvolvimento
+pre-commit>=2.17.0
+ipython>=8.0.0
+ipdb>=0.13.0
+watchdog>=2.1.0
+
+# Profiling e debugging
+memory-profiler>=0.60.0
+line-profiler>=3.4.0
+py-spy>=0.3.0
+
+# Testes de carga
+locust>=2.8.0
+faker>=8.0.0
+
+# Análise de segurança
+bandit>=1.7.0
+safety>=1.10.0
+
+# Ferramentas de container
+docker-compose>=1.29.0
+
+-r requirements.txt 

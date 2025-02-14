@@ -81,7 +81,7 @@ services:
     <<: [*common-settings]
     build:
       context: .
-      dockerfile: meu-servidor-ia/services/image_generator/Dockerfile
+      dockerfile: services/image_generator/Dockerfile
     volumes:
       - ./models:/app/models:ro
       - ./storage:/app/storage
@@ -92,6 +92,13 @@ services:
     environment:
       - PYTHONPATH=/app
       - PYTHONUNBUFFERED=1
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
     depends_on:
       - base
 
@@ -132,6 +139,13 @@ services:
       - CUDA_VISIBLE_DEVICES=3
       - PYTHONPATH=/app
       - PYTHONUNBUFFERED=1
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
     depends_on:
       - base
 
@@ -139,18 +153,21 @@ services:
     <<: *common-settings
     build:
       context: .
-      dockerfile: meu-servidor-ia/services/video_editor/Dockerfile
+      dockerfile: services/video_editor/Dockerfile
     volumes:
-      - ./meu-servidor-ia/shared:/app/shared:z
+      - ./models:/app/models:ro
+      - ./storage:/app/storage
+      - ./logs/editor:/app/logs
+      - ./cache:/app/cache
+      - ./shared:/app/shared
+    ports:
+      - "8005:8000"
     environment:
       - PYTHONPATH=/app
-      - TRANSFORMERS_CACHE=/app/cache/transformers
-      - HF_HOME=/app/cache/huggingface
+      - PYTHONUNBUFFERED=1
     depends_on:
       redis:
         condition: service_healthy
-    ports:
-      - "8005:8000"
 
   redis:
     image: redis:7-alpine
@@ -162,6 +179,8 @@ services:
       interval: 10s
       timeout: 5s
       retries: 3
+    ports:
+      - "6379:6379"
 
   dashboard:
     <<: *common-settings

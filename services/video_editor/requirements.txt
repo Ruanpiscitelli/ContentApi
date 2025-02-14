@@ -1,0 +1,24 @@
+# Dependências principais
+fastapi==0.95.2
+uvicorn[standard]==0.22.0
+python-multipart>=0.0.5,<0.1.0
+pydantic>=1.8.0,<2.0.0
+
+# Processamento de vídeo
+moviepy>=1.0.3
+opencv-python-headless>=4.8.0
+ffmpeg-python==0.2.0
+
+# IA e ML
+torch==2.0.1
+torchvision>=0.15.0
+transformers==4.28.1
+
+# Storage
+minio>=7.1.0
+
+# Utilitários
+python-dotenv>=0.19.0
+httpx>=0.23.0
+tenacity>=8.0.0
+orjson>=3.6.0
