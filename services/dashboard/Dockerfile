@@ -1,42 +1,52 @@
 FROM python:3.10-slim
 
-ENV PYTHONUNBUFFERED=1
-ENV PIP_NO_CACHE_DIR=1
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV USER_NAME=appuser
+# Definir variáveis de ambiente padronizadas
+ENV PYTHONPATH=/app \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    USER_NAME=appuser \
+    APP_HOME=/app/dashboard
 
-# System dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl libcap2-bin && \
-    rm -rf /var/lib/apt/lists/* && \
-    useradd -m -u 1000 ${USER_NAME}
+# Instalar dependências do sistema com otimização de camadas
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    build-essential \
+    python3-dev \
+    curl \
+    git \
+    && rm -rf /var/lib/apt/lists/* && \
+    groupadd -g 1000 ${USER_NAME} && \
+    useradd -m -u 1000 -g ${USER_NAME} ${USER_NAME}
 
+# Configurar diretório de trabalho
 WORKDIR /app
 
-# Install requirements first
-COPY services/dashboard/requirements.txt .
-RUN pip install --no-cache-dir \
-    pydantic==1.10.12 \
-    fastapi==0.95.2 \
-    anyio==3.7.1 \
-    starlette==0.27.0 \
-    -r requirements.txt
+# Copiar e instalar requirements com otimização de cache
+COPY --chown=${USER_NAME}:${USER_NAME} meu-servidor-ia/services/dashboard/requirements.txt ${APP_HOME}/requirements.txt
+RUN pip install --no-cache-dir -r ${APP_HOME}/requirements.txt
 
-# Copy application code
-COPY --chown=appuser:appuser ./services/dashboard /app/services/dashboard
-COPY --chown=appuser:appuser ./shared /app/shared
+# Copiar código da aplicação com permissões corretas
+COPY --chown=${USER_NAME}:${USER_NAME} meu-servidor-ia/services/dashboard ${APP_HOME}
+COPY --chown=${USER_NAME}:${USER_NAME} meu-servidor-ia/shared /app/shared
 
-# Permissions and ports
-RUN mkdir -p /app/logs && \
+# Criar diretórios com permissões seguras
+RUN mkdir -p ${APP_HOME}/{logs,data,static,templates,cache} && \
     chown -R ${USER_NAME}:${USER_NAME} /app && \
-    chmod 755 /app/logs && \
-    setcap 'cap_net_bind_service=+ep' /usr/local/bin/python3.10
+    chmod -R 750 ${APP_HOME} && \
+    chmod -R 770 ${APP_HOME}/logs
 
+# Mudar para o diretório da aplicação
+WORKDIR ${APP_HOME}
+
+# Mudar para usuário não-root
 USER ${USER_NAME}
 
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD curl -f http://localhost:80/health || exit 1
+# Healthcheck otimizado
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
 
-EXPOSE 80
+EXPOSE 8000
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "80"]
+# Comando otimizado com configurações de produção
+CMD ["python3", "-m", "uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1", "--limit-concurrency", "1000", "--timeout-keep-alive", "120"]
