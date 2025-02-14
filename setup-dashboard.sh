@@ -21,6 +21,13 @@ if ! docker info > /dev/null 2>&1; then
     exit 1
 fi
 
+# Verificar se a porta 8006 está disponível
+if lsof -i :8006 > /dev/null; then
+    echo -e "${RED}Erro: Porta 8006 já está em uso${NC}"
+    echo "Por favor, libere a porta 8006 e tente novamente"
+    exit 1
+fi
+
 echo -e "${GREEN}Construindo imagem do dashboard...${NC}"
 
 # Construir a imagem
@@ -29,7 +36,7 @@ docker build -t dashboard-service -f meu-servidor-ia/services/dashboard/Dockerfi
 if [ $? -eq 0 ]; then
     echo -e "${GREEN}Build concluído com sucesso!${NC}"
     echo -e "\nPara executar o serviço:"
-    echo "docker run -p 8000:8000 -v $(pwd)/meu-servidor-ia/shared:/app/shared dashboard-service"
+    echo "docker run -p 8006:8000 -v $(pwd)/meu-servidor-ia/shared:/app/shared dashboard-service"
 else
     echo -e "${RED}Erro durante o build${NC}"
     exit 1
