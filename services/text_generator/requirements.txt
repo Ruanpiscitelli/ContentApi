@@ -1,0 +1,35 @@
+# Web Framework
+fastapi==0.109.0
+uvicorn[standard]==0.27.0.post1
+pydantic==2.6.1
+python-multipart==0.0.9
+requests==2.31.0
+
+# AI/ML
+torch==2.0.0
+transformers==4.36.0
+accelerate==0.25.0
+sentencepiece==0.1.99
+
+# Utilities
+python-dotenv==1.0.1
+httpx==0.27.0
+tenacity==8.2.3
+orjson==3.9.12
+
+# Logging
+python-json-logger==2.0.7
+rich==13.7.0
+
+# Cache e otimização
+redis==5.0.1
+cachetools>=5.0.0
+msgpack>=1.0.3
+
+# Monitoramento
+prometheus-client>=0.14.0
+psutil>=5.9.0
+py3nvml>=0.2.7
+
+# Segurança
+python-jose==3.3.0

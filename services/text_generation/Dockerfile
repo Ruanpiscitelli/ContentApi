@@ -1,65 +1,72 @@
 # Build stage
-FROM nvidia/cuda:12.1.0-devel-ubuntu22.04 AS builder
+FROM nvidia/cuda:12.3.1-devel-ubuntu22.04 as builder
 
-ENV DEBIAN_FRONTEND=noninteractive
-ENV PYTHONUNBUFFERED=1
-ENV PIP_NO_CACHE_DIR=1
+# Configurar variáveis de ambiente
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1
 
 # Instalar dependências do sistema
 RUN apt-get update && apt-get install -y \
     python3.10 \
-    python3.10-dev \
     python3-pip \
+    python3.10-dev \
     build-essential \
-    curl \
+    cmake \
     git \
+    ninja-build \
+    pkg-config \
     && rm -rf /var/lib/apt/lists/*
 
+# Configurar diretório de trabalho
 WORKDIR /build
 
-# Instalar torch primeiro
-RUN pip3 install --no-cache-dir torch==2.2.1 torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+# Instalar PyTorch com suporte CUDA
+RUN pip3 install --no-cache-dir torch==2.0.0 torchvision==0.15.0 --index-url https://download.pytorch.org/whl/cu121
 
 # Copiar e instalar requirements
-COPY ./services/text_generation/requirements.txt .
+COPY requirements.txt .
 RUN pip3 install --no-cache-dir -r requirements.txt
 
 # Runtime stage
-FROM nvidia/cuda:12.1.0-runtime-ubuntu22.04
+FROM nvidia/cuda:12.3.1-runtime-ubuntu22.04
 
-ENV DEBIAN_FRONTEND=noninteractive
-ENV PYTHONUNBUFFERED=1
-ENV PYTHONPATH=/app
+# Configurar variáveis de ambiente
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONPATH=/app
 
-# Instalar runtime deps
+# Instalar dependências de runtime
 RUN apt-get update && apt-get install -y \
     python3.10 \
     python3-pip \
     curl \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd -m -u 1000 appuser
 
-# Criar usuário não-root
-RUN groupadd -g 1000 appuser && \
-    useradd -m -u 1000 -g appuser appuser && \
-    mkdir -p /app/{data,logs,uploads,cache,temp,models} && \
-    chown -R appuser:appuser /app
-
+# Configurar diretórios da aplicação
 WORKDIR /app
+RUN mkdir -p /app/cache/{transformers,torch,huggingface} \
+    && mkdir -p /app/{logs,uploads,temp} \
+    && chown -R appuser:appuser /app \
+    && chmod -R 755 /app/cache
 
 # Copiar pacotes Python do builder
 COPY --from=builder /usr/local/lib/python3.10/dist-packages /usr/local/lib/python3.10/dist-packages
 
 # Copiar código da aplicação
-COPY --chown=appuser:appuser ./services/text_generation /app/services/text_generation
-COPY --chown=appuser:appuser ./shared /app/shared
+COPY --chown=appuser:appuser . /app/services/text_generation
 
+# Mudar para usuário não-root
 USER appuser
 
-WORKDIR /app/services/text_generation
-
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+# Health check
+HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
+# Expor porta
 EXPOSE 8000
 
-CMD ["python3", "-m", "uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
+# Comando para executar a aplicação
+CMD ["python3", "-m", "uvicorn", "services.text_generation.app:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]

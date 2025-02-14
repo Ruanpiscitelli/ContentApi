@@ -11,7 +11,7 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 # Copiar o arquivo requirements.txt para o diretório atual (build context)
-COPY services/video_editor/requirements.txt .
+COPY requirements.txt .
 
 # Instalar as dependências do Python
 RUN pip3 install --no-cache-dir -r requirements.txt
@@ -32,8 +32,7 @@ WORKDIR /app
 COPY --from=builder /usr/local/lib/python3.10/site-packages /usr/local/lib/python3.10/site-packages
 
 # Copiar o restante do código do video_editor para a imagem
-COPY --chown=appuser:appuser services/video_editor /app/services/video_editor
-COPY --chown=appuser:appuser shared /app/shared
+COPY . /app/services/video_editor
 
 USER appuser
 
@@ -42,9 +41,9 @@ ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app/services/video_editor
 
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
 EXPOSE 8000
 
-CMD ["python3", "-m", "uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+CMD ["uvicorn", "services.video_editor.app:app", "--host", "0.0.0.0", "--port", "8000"]

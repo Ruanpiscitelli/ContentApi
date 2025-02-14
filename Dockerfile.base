@@ -1,0 +1,38 @@
+# Imagem base
+FROM python:3.10-slim
+
+# Configurar variáveis de ambiente
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    DEBIAN_FRONTEND=noninteractive
+
+# Instalar dependências do sistema
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    build-essential \
+    curl \
+    git \
+    ffmpeg \
+    && apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Configurar diretório de trabalho
+WORKDIR /app
+
+# Criar usuário não-root
+RUN groupadd -g 1000 appuser && \
+    useradd -m -u 1000 -g appuser appuser && \
+    mkdir -p /app/{logs,cache,models,temp,uploads} && \
+    chown -R appuser:appuser /app
+
+# Copiar e instalar requirements
+COPY --chown=appuser:appuser requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Mudar para usuário não-root
+USER appuser
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1

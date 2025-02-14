@@ -297,3 +297,5 @@ docker-compose up
 
 
 ./start-services.sh
+
+./setup_services.sh

@@ -1,37 +1,57 @@
-# Framework web e utilitários
-fastapi==0.95.2
-uvicorn[standard]==0.22.0
-python-multipart==0.0.6
-python-jose[cryptography]==3.3.0
-passlib[bcrypt]==1.7.4
-pydantic==1.10.12
-email-validator==2.0.0
-starlette==0.27.0
+# Web Framework
+fastapi==0.109.0
+uvicorn[standard]==0.27.0.post1
+pydantic==2.6.1
+python-multipart==0.0.9
+requests==2.31.0
+jinja2==3.1.2
+
+# Frontend
+aiofiles==23.2.1
+python-frontmatter==1.0.0
+markdown2==2.4.10
+python-slugify==8.0.1
+
+# Utilities
+python-dotenv==1.0.1
+httpx==0.27.0
+tenacity==8.2.3
+orjson==3.9.12
+
+# Logging
+python-json-logger==2.0.7
+rich==13.7.0
+
+# Cache e otimização
+redis==5.0.1
+cachetools>=5.0.0
+msgpack>=1.0.3
+
+# Monitoramento
+prometheus-client>=0.14.0
+psutil>=5.9.0
+
+# Segurança
+python-jose==3.3.0
 
 # Banco de dados e migrações
 sqlalchemy==1.4.41
 aiosqlite==0.19.0
 alembic==1.7.7
 
-# Cache
-redis==5.0.1
-
 # Templates e frontend
-jinja2==3.1.2
-python-dotenv==1.0.0
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+email-validator==2.0.0
+starlette==0.27.0
 
 # Logging e monitoramento
 loguru==0.7.0
-
-# Monitoramento
-psutil==5.9.5
 aiohttp==3.8.5
 
 # Utilitários
 python-dateutil==2.8.2
 humanize==4.7.0
-orjson==3.9.7
-aiofiles==23.1.0
 
 # Dependências específicas do uvicorn[standard]
 httptools==0.5.0

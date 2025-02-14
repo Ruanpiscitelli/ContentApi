@@ -22,17 +22,7 @@ x-common-env: &common-env
   TRANSFORMERS_CACHE: /app/cache/transformers
   HF_HOME: /app/cache/huggingface
 
-# Configuração padrão de recursos
-x-resources: &service-resources
-  limits:
-    cpus: '4'
-    memory: 16G
-  reservations:
-    devices:
-      - driver: nvidia
-        count: 1
-        capabilities: [gpu, utility, compute]
-
+# Configuração GPU
 x-gpu-settings: &gpu-settings
   runtime: nvidia
   deploy:
@@ -55,103 +45,85 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.base
-    image: contentapi-base
+    image: content-api-base:latest
 
   video-generator:
     <<: [*common-settings, *gpu-settings]
     build:
-      context: .
-      dockerfile: services/video_generator/Dockerfile
+      context: ./services/video_generator
+      dockerfile: Dockerfile
     volumes: *common-volumes
     ports:
       - "8004:8000"
     environment:
-      - NVIDIA_VISIBLE_DEVICES=0
-      - CUDA_VISIBLE_DEVICES=0
-      - PYTHONPATH=/app
-      - PYTHONUNBUFFERED=1
+      <<: *common-env
+      NVIDIA_VISIBLE_DEVICES: 0
+      CUDA_VISIBLE_DEVICES: 0
     depends_on:
       - base
+      - redis
 
   image-generator:
-    <<: [*common-settings]
+    <<: [*common-settings, *gpu-settings]
     build:
-      context: .
-      dockerfile: services/image_generator/Dockerfile
+      context: ./services/image_generator
+      dockerfile: Dockerfile
     volumes: *common-volumes
     ports:
       - "8002:8000"
     environment:
-      - PYTHONPATH=/app
-      - PYTHONUNBUFFERED=1
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
+      <<: *common-env
+      NVIDIA_VISIBLE_DEVICES: 1
+      CUDA_VISIBLE_DEVICES: 1
     depends_on:
       - base
+      - redis
 
-  text-generation:
+  text-generator:
     <<: [*common-settings, *gpu-settings]
     build:
-      context: .
-      dockerfile: services/text_generation/Dockerfile
+      context: ./services/text_generator
+      dockerfile: Dockerfile
     volumes: *common-volumes
     ports:
-      - "8001:8000"
+      - "8006:8000"
     environment:
-      - NVIDIA_VISIBLE_DEVICES=2
-      - CUDA_VISIBLE_DEVICES=2
-      - PYTHONPATH=/app
-      - PYTHONUNBUFFERED=1
+      <<: *common-env
+      NVIDIA_VISIBLE_DEVICES: 2
+      CUDA_VISIBLE_DEVICES: 2
     depends_on:
       - base
+      - redis
 
   voice-generator:
     <<: [*common-settings, *gpu-settings]
     build:
-      context: .
-      dockerfile: services/voice_generator/Dockerfile
+      context: ./services/voice_generator
+      dockerfile: Dockerfile
     volumes: *common-volumes
     ports:
       - "8003:8000"
     environment:
-      - NVIDIA_VISIBLE_DEVICES=3
-      - CUDA_VISIBLE_DEVICES=3
-      - PYTHONPATH=/app
-      - PYTHONUNBUFFERED=1
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
+      <<: *common-env
+      NVIDIA_VISIBLE_DEVICES: 3
+      CUDA_VISIBLE_DEVICES: 3
     depends_on:
       - base
+      - redis
 
   video-editor:
     <<: *common-settings
     build:
-      context: .
-      dockerfile: services/video_editor/Dockerfile
-    volumes:
-      - ./models:/app/models:ro
-      - ./storage:/app/storage
-      - ./logs/editor:/app/logs
-      - ./cache:/app/cache
-      - ./shared:/app/shared
+      context: ./services/video_editor
+      dockerfile: Dockerfile
+    volumes: *common-volumes
     ports:
       - "8005:8000"
     environment:
-      - PYTHONPATH=/app
-      - PYTHONUNBUFFERED=1
+      <<: *common-env
     depends_on:
-      redis:
-        condition: service_healthy
+      - base
+      - redis
 
   redis:
     image: redis:7-alpine
@@ -171,18 +143,14 @@ services:
     build:
       context: ./services/dashboard
       dockerfile: Dockerfile
-    volumes:
-      - ./shared:/app/shared:z
-      - ./logs/dashboard:/app/dashboard/logs
+    volumes: *common-volumes
     ports:
-      - "8006:8000"
+      - "8001:8000"
     environment:
       <<: *common-env
-      API_HOST: 0.0.0.0
-      API_PORT: 8000
     depends_on:
-      redis:
-        condition: service_healthy
+      - base
+      - redis
 
 networks:
   default:
@@ -192,10 +160,4 @@ networks:
         - subnet: 172.28.0.0/24
 
 volumes:
-  redis_data: {}
-  shared:
-    driver: local
-    driver_opts:
-      type: none
-      device: ./shared
-      o: bind 
+  redis_data: {} 

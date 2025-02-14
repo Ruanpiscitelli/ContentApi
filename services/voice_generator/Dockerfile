@@ -5,9 +5,9 @@ FROM nvidia/cuda:12.3.1-devel-ubuntu22.04 as builder
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    TORCH_CUDA_ARCH_LIST="7.5 8.0 8.6 8.9 9.0+PTX" \
+    TORCH_CUDA_ARCH_LIST="8.9" \
     TORCH_NVCC_FLAGS="-Xfatbin -compress-all" \
-    CMAKE_CUDA_ARCHITECTURES="75 80 86 89 90"
+    CMAKE_CUDA_ARCHITECTURES="89"
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
@@ -21,7 +21,6 @@ RUN apt-get update && apt-get install -y \
     pkg-config \
     && rm -rf /var/lib/apt/lists/*
 
-# Set up build directory
 WORKDIR /build
 
 # Install torch first with CUDA 12.1 support
@@ -30,8 +29,8 @@ RUN pip3 install --no-cache-dir torch==2.2.1 torchaudio==2.2.1 --index-url https
 # Install triton and xformers for optimizations
 RUN pip3 install --no-cache-dir triton==2.1.0 xformers==0.0.23
 
-# Copy and install remaining requirements
-COPY ./services/voice_generator/requirements.txt .
+# Copy and install requirements
+COPY requirements.txt .
 RUN pip3 install --no-cache-dir -r requirements.txt
 
 # Runtime stage
@@ -55,8 +54,9 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/* \
     && useradd -m -u 1000 appuser
 
-# Set up app directory and cache
 WORKDIR /app
+
+# Set up app directory and cache
 RUN mkdir -p /app/cache/{transformers,torch,huggingface} \
     && mkdir -p /app/{logs,uploads,temp} \
     && chown -R appuser:appuser /app
@@ -65,18 +65,11 @@ RUN mkdir -p /app/cache/{transformers,torch,huggingface} \
 COPY --from=builder /usr/local/lib/python3.10/dist-packages /usr/local/lib/python3.10/dist-packages
 
 # Copy application code
-COPY --chown=appuser:appuser ./services/voice_generator /app/services/voice_generator
-COPY --chown=appuser:appuser ./shared /app/shared
+COPY . /app/services/voice_generator
 
-# Switch to non-root user
 USER appuser
 
-# Set working directory
-WORKDIR /app/services/voice_generator
-
-# Health check
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
-# Run the application
-CMD ["python3", "-m", "uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
+CMD ["uvicorn", "services.voice_generator.app:app", "--host", "0.0.0.0", "--port", "8000"]
