@@ -1,13 +1,38 @@
 #!/bin/bash
 
 # Criar estrutura de diretórios base
-mkdir -p meu-servidor-ia/{shared,services}/{text_generation,image_generator,voice_generator,video_generator}/
+mkdir -p services/{image_generator,voice_generator,video_generator,text_generation,video_editor,dashboard}
+mkdir -p shared
+mkdir -p models
+mkdir -p storage
+mkdir -p cache/{transformers,torch,huggingface}
+mkdir -p logs/{image,voice,video,text,editor,dashboard}
+mkdir -p uploads
+mkdir -p temp
 
-# Criar diretórios para dados
-mkdir -p {models,storage,logs/{video,image,text,voice},cache}
+# Copiar arquivos do meu-servidor-ia para a nova estrutura
+if [ -d "meu-servidor-ia" ]; then
+    # Copiar serviços
+    for service in image_generator voice_generator video_generator text_generation video_editor dashboard; do
+        if [ -d "meu-servidor-ia/services/$service" ]; then
+            cp -r meu-servidor-ia/services/$service/* services/$service/
+        fi
+    done
 
-# Criar __init__.py nos diretórios principais
-touch meu-servidor-ia/shared/__init__.py
-for service in text_generation image_generator voice_generator video_generator; do
-    touch meu-servidor-ia/services/${service}/__init__.py
-done 
+    # Copiar shared
+    if [ -d "meu-servidor-ia/shared" ]; then
+        cp -r meu-servidor-ia/shared/* shared/
+    fi
+fi
+
+# Garantir permissões corretas
+chmod -R 755 services
+chmod -R 755 shared
+chmod -R 755 models
+chmod -R 755 storage
+chmod -R 755 cache
+chmod -R 755 logs
+chmod -R 755 uploads
+chmod -R 755 temp
+
+echo "Estrutura de diretórios criada com sucesso!" 

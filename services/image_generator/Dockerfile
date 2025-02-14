@@ -32,7 +32,7 @@ RUN pip3 install --no-cache-dir torch==2.2.1 torchvision==0.17.1 --index-url htt
 RUN pip3 install --no-cache-dir triton==2.1.0 xformers==0.0.23
 
 # Copiar e instalar requirements
-COPY ./requirements.txt .
+COPY meu-servidor-ia/services/image_generator/requirements.txt .
 RUN pip3 install --no-cache-dir -r requirements.txt
 
 # Runtime stage
@@ -69,7 +69,7 @@ COPY --from=builder /usr/local/lib/python3.10/dist-packages /usr/local/lib/pytho
 
 # Criar estrutura de pacotes Python
 RUN mkdir -p /app/services/image_generator
-COPY --chown=appuser:appuser ./ /app/services/image_generator/
+COPY --chown=appuser:appuser ./meu-servidor-ia/services/image_generator/ /app/services/image_generator/
 
 # Mudar para usuário não-root
 USER appuser

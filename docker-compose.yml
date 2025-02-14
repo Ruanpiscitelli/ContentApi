@@ -53,7 +53,7 @@ x-volumes: &common-volumes
 services:
   base:
     build:
-      context: ./meu-servidor-ia
+      context: .
       dockerfile: Dockerfile.base
     image: contentapi-base
 
@@ -62,13 +62,9 @@ services:
     build:
       context: .
       dockerfile: services/video_generator/Dockerfile
-    volumes:
-      - ./models:/app/models:ro
-      - ./storage:/app/storage
-      - ./logs/video:/app/logs
-      - ./cache:/app/cache
+    volumes: *common-volumes
     ports:
-      - "8003:8000"
+      - "8004:8000"
     environment:
       - NVIDIA_VISIBLE_DEVICES=0
       - CUDA_VISIBLE_DEVICES=0
@@ -82,11 +78,7 @@ services:
     build:
       context: .
       dockerfile: services/image_generator/Dockerfile
-    volumes:
-      - ./models:/app/models:ro
-      - ./storage:/app/storage
-      - ./logs/image:/app/logs
-      - ./cache:/app/cache
+    volumes: *common-volumes
     ports:
       - "8002:8000"
     environment:
@@ -107,13 +99,9 @@ services:
     build:
       context: .
       dockerfile: services/text_generation/Dockerfile
-    volumes:
-      - ./models:/app/models:ro
-      - ./storage:/app/storage
-      - ./logs/text:/app/logs
-      - ./cache:/app/cache
+    volumes: *common-volumes
     ports:
-      - "8004:8000"
+      - "8001:8000"
     environment:
       - NVIDIA_VISIBLE_DEVICES=2
       - CUDA_VISIBLE_DEVICES=2
@@ -127,11 +115,7 @@ services:
     build:
       context: .
       dockerfile: services/voice_generator/Dockerfile
-    volumes:
-      - ./models:/app/models:ro
-      - ./storage:/app/storage
-      - ./logs/voice:/app/logs
-      - ./cache:/app/cache
+    volumes: *common-volumes
     ports:
       - "8003:8000"
     environment:
@@ -213,5 +197,5 @@ volumes:
     driver: local
     driver_opts:
       type: none
-      device: ./meu-servidor-ia/shared
+      device: ./shared
       o: bind 
