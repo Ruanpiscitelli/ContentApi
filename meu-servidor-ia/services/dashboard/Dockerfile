@@ -1,57 +1,52 @@
 FROM python:3.10-slim
 
-# Definir variáveis de ambiente
-ENV PYTHONPATH=/app/services/dashboard
-ENV PYTHONUNBUFFERED=1
-ENV USER_NAME=appuser
-ENV PIP_NO_CACHE_DIR=1
-ENV PYTHONDONTWRITEBYTECODE=1
+# Definir variáveis de ambiente padronizadas
+ENV PYTHONPATH=/app \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    USER_NAME=appuser \
+    APP_HOME=/app/services/dashboard
 
-# Instalar dependências do sistema
+# Instalar dependências do sistema com otimização de camadas
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     build-essential \
     python3-dev \
     curl \
     git \
-    && rm -rf /var/lib/apt/lists/*
-
-# Criar usuário não-root
-RUN useradd -m -u 1000 ${USER_NAME}
+    && rm -rf /var/lib/apt/lists/* && \
+    groupadd -g 1000 ${USER_NAME} && \
+    useradd -m -u 1000 -g ${USER_NAME} ${USER_NAME}
 
 # Configurar diretório de trabalho
 WORKDIR /app
 
-# Copiar apenas os requirements primeiro
-COPY --chown=appuser:appuser services/dashboard/requirements.txt /app/requirements.txt
+# Copiar e instalar requirements com otimização de cache
+COPY --chown=${USER_NAME}:${USER_NAME} services/dashboard/requirements.txt ${APP_HOME}/requirements.txt
+RUN pip install --no-cache-dir -r ${APP_HOME}/requirements.txt
 
-# Instalar dependências Python
-RUN pip install --no-cache-dir -r /app/requirements.txt
+# Copiar código da aplicação com permissões corretas
+COPY --chown=${USER_NAME}:${USER_NAME} ./services/dashboard ${APP_HOME}
+COPY --chown=${USER_NAME}:${USER_NAME} ./shared /app/shared
 
-# Copiar o resto dos arquivos do projeto
-COPY --chown=appuser:appuser ./services/dashboard /app/services/dashboard
-COPY --chown=appuser:appuser ./shared /app/shared
-
-# Criar diretórios e ajustar permissões
-RUN mkdir -p /app/services/dashboard/logs /app/services/dashboard/data /app/services/dashboard/static /app/services/dashboard/templates /app/services/dashboard/logs/api && \
+# Criar diretórios com permissões seguras
+RUN mkdir -p ${APP_HOME}/{logs,data,static,templates,cache} && \
     chown -R ${USER_NAME}:${USER_NAME} /app && \
-    chmod -R 755 /app/services/dashboard/logs && \
-    chmod -R 755 /app/services/dashboard/data && \
-    chmod -R 755 /app/services/dashboard/static && \
-    chmod -R 755 /app/services/dashboard/templates && \
-    chmod -R 777 /app/services/dashboard/logs/api
+    chmod -R 750 ${APP_HOME} && \
+    chmod -R 770 ${APP_HOME}/logs
 
-# Mudar para o diretório do serviço
-WORKDIR /app/services/dashboard
+# Mudar para o diretório da aplicação
+WORKDIR ${APP_HOME}
 
 # Mudar para usuário não-root
 USER ${USER_NAME}
 
-# Healthcheck
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+# Healthcheck otimizado
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
 EXPOSE 8000
 
-# Inicializar o banco de dados e iniciar o servidor
-CMD ["sh", "-c", "python -c 'from main import init_db; import asyncio; asyncio.run(init_db())' && python3 -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload"] 
+# Comando otimizado com configurações de produção
+CMD ["python3", "-m", "uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1", "--limit-concurrency", "1000", "--timeout-keep-alive", "120"]
