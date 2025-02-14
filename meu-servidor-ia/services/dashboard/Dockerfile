@@ -6,7 +6,7 @@ ENV PYTHONPATH=/app \
     PIP_NO_CACHE_DIR=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     USER_NAME=appuser \
-    APP_HOME=/app/services/dashboard
+    APP_HOME=/app/dashboard
 
 # Instalar dependências do sistema com otimização de camadas
 RUN apt-get update && \
@@ -23,15 +23,15 @@ RUN apt-get update && \
 WORKDIR /app
 
 # Copiar e instalar requirements com otimização de cache
-COPY --chown=${USER_NAME}:${USER_NAME} ./requirements.txt ${APP_HOME}/requirements.txt
+COPY requirements.txt ${APP_HOME}/requirements.txt
 RUN pip install --no-cache-dir -r ${APP_HOME}/requirements.txt
 
 # Copiar código da aplicação com permissões corretas
-COPY --chown=${USER_NAME}:${USER_NAME} . ${APP_HOME}
-COPY --chown=${USER_NAME}:${USER_NAME} ../shared /app/shared
+COPY . ${APP_HOME}
 
 # Criar diretórios com permissões seguras
 RUN mkdir -p ${APP_HOME}/{logs,data,static,templates,cache} && \
+    mkdir -p /app/shared && \
     chown -R ${USER_NAME}:${USER_NAME} /app && \
     chmod -R 750 ${APP_HOME} && \
     chmod -R 770 ${APP_HOME}/logs
@@ -49,4 +49,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 EXPOSE 8000
 
 # Comando otimizado com configurações de produção
-CMD ["python3", "-m", "uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1", "--limit-concurrency", "1000", "--timeout-keep-alive", "120"]
+CMD ["python3", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1", "--limit-concurrency", "1000", "--timeout-keep-alive", "120"]

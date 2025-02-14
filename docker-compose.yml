@@ -164,31 +164,22 @@ services:
       retries: 3
 
   dashboard:
-    <<: *common-settings
     build:
-      context: ./meu-servidor-ia
-      dockerfile: services/dashboard/Dockerfile
-      args:
-        PYTHON_VERSION: "3.10"
-        USER_NAME: appuser
-        USER_UID: 1000
-        USER_GID: 1000
-    ports:
-      - "80:80"
-    cap_add:
-      - NET_BIND_SERVICE
-    environment:
-      <<: *common-env
-      API_HOST: 0.0.0.0
-      API_PORT: 8000
-    depends_on:
-      - video-generator
-      - image-generator
-      - text-generation
-      - voice-generator
-      - video-editor
+      context: ./services/dashboard
+      dockerfile: Dockerfile
     volumes:
-      - ./meu-servidor-ia/shared:/app/shared:z
+      - ./shared:/app/shared
+      - ./logs:/app/dashboard/logs
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONPATH=/app
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
 
 networks:
   default:
