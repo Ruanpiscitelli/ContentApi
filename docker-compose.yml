@@ -60,7 +60,7 @@ services:
   video-generator:
     <<: [*common-settings, *gpu-settings]
     build:
-      context: ./meu-servidor-ia
+      context: .
       dockerfile: services/video_generator/Dockerfile
     volumes:
       - ./models:/app/models:ro
@@ -105,7 +105,7 @@ services:
   text-generation:
     <<: [*common-settings, *gpu-settings]
     build:
-      context: ./meu-servidor-ia
+      context: .
       dockerfile: services/text_generation/Dockerfile
     volumes:
       - ./models:/app/models:ro
@@ -125,7 +125,7 @@ services:
   voice-generator:
     <<: [*common-settings, *gpu-settings]
     build:
-      context: ./meu-servidor-ia
+      context: .
       dockerfile: services/voice_generator/Dockerfile
     volumes:
       - ./models:/app/models:ro
@@ -133,7 +133,7 @@ services:
       - ./logs/voice:/app/logs
       - ./cache:/app/cache
     ports:
-      - "8005:8000"
+      - "8003:8000"
     environment:
       - NVIDIA_VISIBLE_DEVICES=3
       - CUDA_VISIBLE_DEVICES=3
@@ -185,10 +185,10 @@ services:
   dashboard:
     <<: *common-settings
     build:
-      context: ./meu-servidor-ia/services/dashboard
+      context: ./services/dashboard
       dockerfile: Dockerfile
     volumes:
-      - ./meu-servidor-ia/shared:/app/shared:z
+      - ./shared:/app/shared:z
       - ./logs/dashboard:/app/dashboard/logs
     ports:
       - "8006:8000"
