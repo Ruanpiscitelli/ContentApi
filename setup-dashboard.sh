@@ -8,8 +8,8 @@ NC='\033[0m'
 echo -e "${GREEN}Iniciando setup do serviço dashboard...${NC}"
 
 # Verificar se estamos no diretório correto
-if [ ! -d "services/dashboard" ]; then
-    echo -e "${RED}Erro: Diretório services/dashboard não encontrado${NC}"
+if [ ! -d "meu-servidor-ia/services/dashboard" ]; then
+    echo -e "${RED}Erro: Diretório meu-servidor-ia/services/dashboard não encontrado${NC}"
     echo "Por favor, execute este script do diretório raiz do projeto"
     exit 1
 fi
@@ -24,12 +24,12 @@ fi
 echo -e "${GREEN}Construindo imagem do dashboard...${NC}"
 
 # Construir a imagem
-docker build -t dashboard-service -f services/dashboard/Dockerfile services/dashboard
+docker build -t dashboard-service -f meu-servidor-ia/services/dashboard/Dockerfile meu-servidor-ia/services/dashboard
 
 if [ $? -eq 0 ]; then
     echo -e "${GREEN}Build concluído com sucesso!${NC}"
     echo -e "\nPara executar o serviço:"
-    echo "docker run -p 8000:8000 -v $(pwd)/shared:/app/shared dashboard-service"
+    echo "docker run -p 8000:8000 -v $(pwd)/meu-servidor-ia/shared:/app/shared dashboard-service"
 else
     echo -e "${RED}Erro durante o build${NC}"
     exit 1
